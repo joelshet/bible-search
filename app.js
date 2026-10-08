@@ -28,7 +28,7 @@ let reqId = 0;
 
 const narrow = matchMedia("(max-width: 860px)");
 // mapRead: null means "hide while reading on a phone, show on a laptop".
-const defaults = { size: "m", spacing: "normal", font: "serif", theme: "auto", ruler: false, italics: true, red: false, paragraphs: false, motion: false, bottom: false, sort: "relevance", map: true, mapRead: null };
+const defaults = { size: "m", spacing: "normal", font: "serif", theme: "auto", ruler: false, italics: true, red: false, paragraphs: false, motion: false, bottom: false, rate: 1, sort: "relevance", map: true, mapRead: null };
 let settings = { ...defaults };
 try {
   Object.assign(settings, JSON.parse(localStorage.getItem("bible-settings") || "{}"));
@@ -254,10 +254,14 @@ let lastPushed = "";
 function syncUrl(push) {
   const url = stateUrl();
   if (url === location.pathname + location.search) return;
-  if (push && url !== lastPushed) {
-    history.pushState(null, "", url);
-    lastPushed = url;
-  } else history.replaceState(null, "", url);
+  // Browsers refuse history updates that come too fast, and some throw; a long scroll through
+  // the reader can get there. The address then lags until the next update goes through.
+  try {
+    if (push && url !== lastPushed) {
+      history.pushState(null, "", url);
+      lastPushed = url;
+    } else history.replaceState(null, "", url);
+  } catch {}
 }
 let pauseTimer = 0;
 
@@ -298,6 +302,7 @@ function setMode(m) {
   const changed = m !== mode;
   // Results and the reader scroll in the same box, so the results' place is kept by hand.
   if (changed && m === "read") listScroll = $("results").scrollTop;
+  if (changed && m !== "read" && speaking >= 0) stopListening();
   mode = m;
   shell.dataset.mode = m;
   if (changed) applySettings(); // only the map's visibility depends on the mode
@@ -309,6 +314,7 @@ function setMode(m) {
 function openReader(v, push = true) {
   if (!reader || v < 0) return;
   setMode("read");
+  if (speaking >= 0) return speakFrom(v, push); // the voice goes where you go
   focusVerse = v;
   syncRail();
   map?.setSelected(v);
@@ -337,6 +343,7 @@ function syncRail() {
 
 function openContents(push = true) {
   if (!reader) return;
+  if (speaking >= 0) stopListening();
   setMode("read");
   focusVerse = -1;
   syncRail();
@@ -397,6 +404,7 @@ $("reader").addEventListener("click", (e) => {
   const word = t.closest(".w[data-s]");
   if (word) return openLexicon(word.dataset.s);
   const line = t.closest(".vl");
+  if (line && speaking >= 0) return speakFrom(Number(line.dataset.v));
   if (line) {
     reader.mark(Number(line.dataset.v));
     focusVerse = Number(line.dataset.v);
@@ -479,9 +487,11 @@ function showPlace() {
   const searched = shown.q.trim() !== "";
   $("read-btn").setAttribute("aria-pressed", String(mode === "read"));
   $("sort-btn").disabled = !searched || mode === "read";
-  status.hidden = !searched && mode === "read"; // nothing to say above a chapter when there's no search
+  $("listen-btn").setAttribute("aria-pressed", String(speaking >= 0));
+  // Nothing to say above a chapter when there's no search and nothing playing.
+  status.hidden = !searched && mode === "read" && speaking < 0;
   status.scrollLeft = 0;
-  if (!searched) return status.replaceChildren(tryLine);
+  if (!searched && speaking < 0) return status.replaceChildren(tryLine);
   status.replaceChildren();
   const add = (html, cls) => {
     const span = document.createElement("span");
@@ -490,7 +500,12 @@ function showPlace() {
     status.append(span);
     return span;
   };
+  if (speaking >= 0) {
+    add(`<button type="button" data-listen="stop">stop</button>`);
+    add(`<button type="button" data-listen="slower">slower</button> ${settings.rate}× <button type="button" data-listen="faster">faster</button>`);
+  }
   if (mode === "read") {
+    if (!searched) return;
     const back = add(`<button type="button">← ${plural(shown.total, "result")} for “${esc(shown.q.trim())}”</button>`);
     back.querySelector("button").onclick = leaveReader;
     return;
@@ -705,6 +720,81 @@ $("lex").addEventListener("click", (e) => {
   }
   if (e.target.closest(".close")) $("lex").hidden = true;
 });
+
+// ---------- listening ----------
+
+// The device's own voice reads on from the current verse, one verse per utterance, so the
+// page can follow and a tap on any verse jumps there at once.
+const synth = window.speechSynthesis;
+const RATES = [0.8, 1, 1.25, 1.5, 2];
+let speaking = -1; // the verse being read aloud, or -1
+let speakTurn = 0; // changes on every start and stop, so a cancelled verse's ending is ignored
+let utterance = null; // held here because some browsers drop an utterance nobody references
+let wake = null;
+
+function sayable(v) {
+  const c = chapterOf(v);
+  const heading = v === meta.chapterStart[c] ? `${meta.books[meta.chapterBook[c]][1]} ${meta.chapterNum[c]}. ` : "";
+  // The KJV prints LORD and GOD in capitals, which a voice may spell out letter by letter.
+  return heading + meta.text[v].replace("¶", "").trim().replace(/\b[A-Z]{2,}\b/g, (w) => w[0] + w.slice(1).toLowerCase());
+}
+
+function speakFrom(v, push = false) {
+  const turn = ++speakTurn;
+  if (synth.speaking || synth.pending) synth.cancel();
+  if (v < 0 || v >= meta.text.length) return stopListening();
+  speaking = v;
+  utterance = new SpeechSynthesisUtterance(sayable(v));
+  utterance.rate = settings.rate;
+  utterance.onend = () => turn === speakTurn && speakFrom(v + 1);
+  utterance.onerror = () => turn === speakTurn && stopListening();
+  synth.speak(utterance);
+
+  focusVerse = v;
+  syncRail();
+  map?.setSelected(v);
+  const line = $("reader").querySelector(`.vl[data-v="${v}"]`);
+  if (line) {
+    reader.mark(v);
+    line.scrollIntoView({ block: "center", behavior: settings.motion ? "smooth" : "auto" });
+  } else reader.open(v);
+  syncUrl(push);
+}
+
+function stopListening() {
+  speakTurn++;
+  speaking = -1;
+  synth.cancel();
+  wake?.release();
+  wake = null;
+  showPlace();
+}
+
+$("listen-btn").onclick = () => {
+  if (speaking >= 0) return stopListening();
+  if (!meta) return;
+  let v = currentVerse();
+  if (v < 0) v = lastRead();
+  if (mode !== "read") setMode("read");
+  speakFrom(Math.max(v, 0), true);
+  showPlace();
+  // A phone that dims its screen stops the voice, so keep it awake while listening.
+  navigator.wakeLock?.request("screen").then((lock) => (speaking >= 0 ? (wake = lock) : lock.release()), () => {});
+};
+$("listen-btn").hidden = !synth;
+
+status.addEventListener("click", (e) => {
+  const act = e.target.closest("[data-listen]")?.dataset.listen;
+  if (!act || speaking < 0) return;
+  if (act === "stop") return stopListening();
+  const i = Math.max(0, RATES.indexOf(settings.rate)) + (act === "faster" ? 1 : -1);
+  settings.rate = RATES[Math.min(Math.max(i, 0), RATES.length - 1)];
+  applySettings();
+  speakFrom(speaking); // a new speed takes effect from the start of the verse
+  showPlace();
+});
+// A voice left running would carry on over the next page.
+addEventListener("pagehide", () => synth?.cancel());
 
 // ---------- present, QR, settings, help ----------
 
