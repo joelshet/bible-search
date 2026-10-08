@@ -52,7 +52,7 @@
     <section id="results" aria-label="Results">
       <div id="intro">
         <nav id="books" class="contents" aria-label="Books of the Bible"></nav>
-        <p class="credits">King James Version, 1769 text, with Strong's tagging from CrossWire and eBible.org. Strong's dictionaries from <a href="https://github.com/openscriptures/strongs">Open Scriptures</a> (CC BY-SA). Synonyms from <a href="https://wordnet.princeton.edu/">WordNet 3.0</a>, Princeton University. EB Garamond and Atkinson Hyperlegible fonts (OFL). Runs entirely in your browser and works offline after the first visit.</p>
+        <p class="credits">King James Version, 1769 text, with Strong's tagging from CrossWire and eBible.org. Strong's dictionaries from <a href="https://github.com/openscriptures/strongs">Open Scriptures</a> (CC BY-SA). Synonyms from <a href="https://wordnet.princeton.edu/">WordNet 3.0</a>, Princeton University. ESV text, shown only to readers who add their own key, comes from the <a href="https://www.esv.org">ESV® Bible</a>, © 2001 by Crossway. Used by permission. All rights reserved. EB Garamond and Atkinson Hyperlegible fonts (OFL). Runs entirely in your browser and works offline after the first visit.</p>
       </div>
       <ol id="list"></ol>
       <div id="more" aria-hidden="true"></div>
@@ -121,6 +121,10 @@
         <label><input type="checkbox" name="red"> Words of Jesus in red</label>
         <label><input type="checkbox" name="paragraphs"> Read in paragraphs instead of one verse per line</label>
         <label><input type="checkbox" name="motion"> Animate the map when jumping to a verse</label>
+      </fieldset>
+      <fieldset class="key"><legend>English Standard Version</legend>
+        <label>ESV API key <input type="text" name="esvKey" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+        <p>With a free key from <a href="https://api.esv.org" target="_blank" rel="noopener">api.esv.org</a>, the reader can show the ESV, alone or beside the King James. The key stays in this browser.</p>
       </fieldset>
       <fieldset><legend>On a phone</legend>
         <label><input type="checkbox" name="bottom"> Search box at the bottom of the screen, by your thumb</label>
