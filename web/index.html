@@ -16,6 +16,7 @@
 </head>
 <body>
 <bible-search>
+  <h1 id="title"><a href="./">Bible Search</a></h1>
   <header>
     <form role="search" id="search-form">
       <label for="q" class="sr">Search the King James Bible</label>
@@ -38,24 +39,21 @@
   <main>
     <section id="results" aria-label="Results">
       <div id="intro">
-        <p class="lede">Type a verse the way you remember it.</p>
-        <p>Modern wording is fine. The search knows the King James says <i>weary</i> where you'd say tired, and <i>charity</i> where Paul's Greek says agape.</p>
-        <p class="try">Try
+        <p class="try">Modern wording is fine. Try
           <button type="button" data-q="eagles not getting tired">eagles not getting tired</button>,
           <button type="button" data-q="plans to prosper you">plans to prosper you</button>,
           <button type="button" data-q="do not worry about tomorrow">do not worry about tomorrow</button>,
           <button type="button" data-q="agape">agape</button>,
           <button type="button" data-q="ps 23">ps 23</button>, or
           <button type="button" data-q="fear in:gospels">fear in:gospels</button>.</p>
-        <p>Or open the <button type="button" class="link" data-act="contents">contents</button> and read.</p>
-        <p>On a result, <i>context</i> opens the chapter around the verse and <i>read</i> starts reading there; going back returns you to the result. Tap any word, or a note under the verse, for the Hebrew or Greek behind it.</p>
-        <p class="quiet">Quotes find exact phrases, <code>in:john</code> narrows the search, and <code>G26</code> finds a Strong's number. Press <kbd>?</kbd> for the rest.</p>
+        <nav id="books" class="contents" aria-label="Books of the Bible"></nav>
         <p class="credits">King James Version, 1769 text, with Strong's tagging from CrossWire and eBible.org. Strong's dictionaries from <a href="https://github.com/openscriptures/strongs">Open Scriptures</a> (CC BY-SA). Synonyms from <a href="https://wordnet.princeton.edu/">WordNet 3.0</a>, Princeton University. EB Garamond and Atkinson Hyperlegible fonts (OFL). Runs entirely in your browser and works offline after the first visit.</p>
       </div>
       <ol id="list"></ol>
       <div id="more" aria-hidden="true"></div>
       <div id="reader"></div>
     </section>
+    <nav id="rail" aria-label="Chapters of this book" hidden></nav>
     <section id="map-panel" aria-label="Map of the whole Bible">
       <canvas id="map" tabindex="0" aria-label="Map of every verse in the Bible. Drag to move, scroll or pinch to zoom, click a verse to open it."></canvas>
       <div id="tip" hidden></div>
