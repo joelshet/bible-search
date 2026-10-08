@@ -477,13 +477,15 @@ impl Results {
         best.map(|(_, m)| m)
     }
 
-    /// Short reasons for one verse: "tired ≈ weary", "love → charity (G26 agapē)".
-    pub fn reasons(&self, bible: &Bible, v: usize) -> Vec<String> {
-        let mut out: Vec<String> = Vec::new();
+    /// Short reasons for one verse: "tired ≈ weary", "love → charity (G26 agapē)",
+    /// each with the Strong's number behind the matched word when it has one.
+    pub fn reasons(&self, bible: &Bible, v: usize) -> Vec<(String, Option<u16>)> {
+        let mut out: Vec<(String, Option<u16>)> = Vec::new();
         let text = bible.verse_text(v);
         for (k, (a, b)) in text::words(text).into_iter().enumerate() {
             let word = &text[a..b];
-            let Some(m) = self.mark(bible, word, bible.word_off[v] as usize + k) else { continue };
+            let w = bible.word_off[v] as usize + k;
+            let Some(m) = self.mark(bible, word, w) else { continue };
             let typed = &self.query.terms[m.term].typed;
             let shown = text::normalize(word);
             let r = match m.why {
@@ -500,8 +502,8 @@ impl Results {
                     format!("{typed} → {shown} ({} {tl})", strongs_name(code))
                 }
             };
-            if !out.contains(&r) {
-                out.push(r);
+            if !out.iter().any(|(text, _)| *text == r) {
+                out.push((r, m.strongs.or_else(|| bible.strongs_of_word(w).first().copied())));
             }
         }
         out.truncate(4);

@@ -20,6 +20,7 @@ export class BibleMap {
     this.verses = (layout.length / 4) - this.books - this.chapters;
     this.hits = null;
     this.selected = -1;
+    this.keepClear = []; // screen boxes [x0, y0, x1, y1] that book labels stay out of
     this.wrapCache = new Map();
     this.cam = { x: aspect / 2, y: 0.5, k: 1 };
     this.family = "Georgia, serif";
@@ -380,26 +381,43 @@ export class BibleMap {
       }
     }
 
-    // Labels: book names in letterspaced capitals when zoomed out, chapter numbers in between.
+    // Labels: every book in letterspaced capitals at one size, chapter numbers in between.
+    // A book too small for its name gets its short name, and the smallest books only
+    // go unlabelled where a label would sit on top of another.
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     const spaced = "letterSpacing" in ctx;
-    for (const b of visibleBooks) {
+    const size = this.w < 500 ? 10 : 12;
+    ctx.font = `500 ${size}px ${this.labelFamily}`;
+    if (spaced) ctx.letterSpacing = `${size * 0.16}px`;
+    const placed = this.keepClear.slice();
+    const nudges = [[0, 0], [0, -1], [0, 1], [-1, 0], [1, 0]];
+    const place = (b, text, mustFit) => {
       const r = this.bookRect(b);
       const w = r[2] * k, h = r[3] * k;
-      const name = this.meta.books[b][1].toUpperCase();
-      const size = Math.min(17, w / (name.length * 0.95), h * 0.3);
-      if (size < 7.5 || (textShown && w > this.w * 0.6)) continue;
-      ctx.font = `500 ${size}px ${this.labelFamily}`;
-      if (spaced) ctx.letterSpacing = `${size * 0.16}px`;
-      ctx.fillStyle = colors.paper;
-      ctx.globalAlpha = 0.75;
-      const tw = ctx.measureText(name).width;
-      ctx.fillRect(sx(r[0]) + w / 2 - tw / 2 - 4, sy(r[1]) + h / 2 - size * 0.7, tw + 8, size * 1.4);
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = colors.ink;
-      ctx.fillText(name, sx(r[0]) + w / 2, sy(r[1]) + h / 2 + size * 0.05);
-    }
+      const tw = ctx.measureText(text).width + 6, th = size * 1.3;
+      if (mustFit && (tw > w || th > h)) return false;
+      // A label that can't sit on its book's middle may shift by half its own size.
+      for (const [dx, dy] of mustFit ? nudges.slice(0, 1) : nudges) {
+        const x = Math.min(Math.max(sx(r[0]) + w / 2 + dx * tw / 2, tw / 2), this.w - tw / 2);
+        const y = Math.min(Math.max(sy(r[1]) + h / 2 + dy * th / 2, th / 2), this.h - th / 2);
+        const box = [x - tw / 2, y - th / 2, x + tw / 2, y + th / 2];
+        if (placed.some((p) => box[0] < p[2] && box[2] > p[0] && box[1] < p[3] && box[3] > p[1])) continue;
+        placed.push(box);
+        ctx.fillStyle = colors.paper;
+        ctx.globalAlpha = 0.75;
+        ctx.fillRect(box[0], box[1], tw, th);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = colors.ink;
+        ctx.fillText(text, x, y + size * 0.05);
+        return true;
+      }
+      return false;
+    };
+    const area = (b) => this.rects[b * 4 + 2] * this.rects[b * 4 + 3];
+    const labelled = visibleBooks.filter((b) => !(textShown && this.rects[b * 4 + 2] * k > this.w * 0.6));
+    const tight = labelled.filter((b) => !place(b, this.meta.books[b][1].toUpperCase(), true));
+    for (const b of tight.sort((a, c) => area(c) - area(a))) place(b, this.meta.books[b][2].toUpperCase(), false);
     if (spaced) ctx.letterSpacing = "0px";
     if (!textShown) {
       ctx.textAlign = "left";

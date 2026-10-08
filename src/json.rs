@@ -23,6 +23,7 @@ pub fn esc(out: &mut String, s: &str) {
 }
 
 /// A verse as segments: ["gap text"] or ["word", flags, "why", "strongs codes", term].
+/// With results, "why" lists each reason as ["text", "strongs code or empty"].
 pub fn verse(out: &mut String, b: &Bible, v: usize, results: Option<&Results>) {
     let text = b.verse_text(v);
     let _ = write!(out, "{{\"id\":{v},\"ref\":");
@@ -59,11 +60,15 @@ pub fn verse(out: &mut String, b: &Bible, v: usize, results: Option<&Results>) {
     out.push(']');
     if let Some(r) = results {
         out.push_str(",\"why\":[");
-        for (i, reason) in r.reasons(b, v).iter().enumerate() {
+        for (i, (reason, code)) in r.reasons(b, v).iter().enumerate() {
             if i > 0 {
                 out.push(',');
             }
+            out.push('[');
             esc(out, reason);
+            out.push(',');
+            esc(out, &code.map(strongs_name).unwrap_or_default());
+            out.push(']');
         }
         out.push(']');
     }
@@ -176,7 +181,7 @@ pub fn strongs(b: &Bible, name: &str) -> String {
     out
 }
 
-/// Books, chapter starts, and every verse's text, for the map and present mode.
+/// Books as [code, name, short name], chapter starts, and every verse's text, for the map and present mode.
 pub fn meta(b: &Bible) -> String {
     let mut out = String::from("{\"books\":[");
     for (i, book) in BOOKS.iter().enumerate() {
@@ -185,6 +190,8 @@ pub fn meta(b: &Bible) -> String {
         }
         let _ = write!(out, "[\"{}\",", book.code);
         esc(&mut out, book.name);
+        out.push(',');
+        esc(&mut out, book.short);
         out.push(']');
     }
     out.push_str("],\"chapterStart\":[");

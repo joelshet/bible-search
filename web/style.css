@@ -12,6 +12,7 @@
   --rule: #e9e6df;
   --rubric: #b3261e;
   --wash: rgba(179, 38, 30, 0.07);
+  --here: rgba(28, 27, 25, 0.05);
   --tile: #e6e2d9;
   --tile-alt: #dedad0;
   --glow: #b3261e;
@@ -25,13 +26,15 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --paper: #0e0e0e; --ink: #e6e3dc; --quiet: #75726c; --rule: #222120; --rubric: #e0574d;
-    --wash: rgba(224, 87, 77, 0.1); --tile: #1b1a19; --tile-alt: #201f1d; --glow: #ff6a4d;
+    --wash: rgba(224, 87, 77, 0.1); --here: rgba(230, 227, 220, 0.07);
+    --tile: #1b1a19; --tile-alt: #201f1d; --glow: #ff6a4d;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --paper: #0e0e0e; --ink: #e6e3dc; --quiet: #75726c; --rule: #222120; --rubric: #e0574d;
-  --wash: rgba(224, 87, 77, 0.1); --tile: #1b1a19; --tile-alt: #201f1d; --glow: #ff6a4d;
+  --wash: rgba(224, 87, 77, 0.1); --here: rgba(230, 227, 220, 0.07);
+  --tile: #1b1a19; --tile-alt: #201f1d; --glow: #ff6a4d;
   color-scheme: dark;
 }
 :root[data-size="s"] { --fs: 17px; }
@@ -57,7 +60,7 @@ a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 0.15e
 ::selection { background: var(--wash); }
 
 /* Small caps carry every label: references, controls, counts. */
-.ref, header nav button, #status, .map-tools button, dialog h2, legend, #lex .code {
+.ref, .act, header nav button, #status, .map-tools button, dialog h2, legend, #lex .code {
   font-variant-caps: all-small-caps;
   letter-spacing: 0.06em;
 }
@@ -65,7 +68,7 @@ a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 0.15e
 bible-search {
   display: grid;
   grid-template-rows: auto 1fr;
-  height: 100dvh;
+  height: var(--app-height, 100dvh);
 }
 
 /* ---------- header ---------- */
@@ -97,7 +100,7 @@ bible-search > header {
 #loading:empty { display: none; }
 
 header nav { display: flex; gap: 2px 16px; padding-bottom: 10px; flex-wrap: wrap; }
-header nav button, .map-tools button, .try button, #status button, dialog form > button, #lex .actions button, .context nav button {
+header nav button, .map-tools button, .try button, #status button, dialog form > button, #lex .actions button, .context nav button, .act {
   border: 0;
   background: none;
   padding: 2px 0;
@@ -107,7 +110,14 @@ header nav button, .map-tools button, .try button, #status button, dialog form >
 }
 header nav button:hover, header nav button:focus-visible, .map-tools button:hover { color: var(--ink); }
 header nav button[aria-pressed="false"] { text-decoration: line-through; text-decoration-thickness: 1px; }
-#status { grid-column: 1 / -1; min-height: 1.5em; color: var(--quiet); font-size: 15px; display: flex; flex-wrap: wrap; gap: 0 18px; }
+/* One line. Anything that doesn't fit scrolls sideways, and the right edge fades to say so. */
+#status {
+  grid-column: 1 / -1; min-height: 1.5em; color: var(--quiet); font-size: 15px;
+  display: flex; gap: 18px; white-space: nowrap; overflow-x: auto; scrollbar-width: none;
+  padding-right: 28px; mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+}
+#status::-webkit-scrollbar { display: none; }
+#status > * { flex: none; }
 #status .note { color: var(--rubric); }
 #status button { color: var(--rubric); font-size: 15px; }
 :focus-visible { outline: 1px solid var(--rubric); outline-offset: 3px; }
@@ -148,21 +158,28 @@ bible-search[data-has-query] #intro { display: none; }
 #list { list-style: none; margin: 0; padding: 0; }
 .hit { position: relative; padding: 14px 0 18px; }
 .hit + .hit { border-top: 1px solid var(--rule); }
-.hit.selected { background: var(--wash); box-shadow: 0 0 0 14px var(--wash); border-top-color: transparent; }
+.hit.selected { background: var(--here); box-shadow: 0 0 0 14px var(--here); border-top-color: transparent; }
 .hit.selected + .hit { border-top-color: transparent; }
 .hit.selected .ref::before { content: "¶ "; }
 :root[data-ruler="on"] .hit:not(.selected) { opacity: 0.28; }
-.hit-head { display: flex; flex-wrap: wrap; gap: 0 12px; align-items: baseline; margin-bottom: 2px; }
+.hit-head { display: flex; flex-wrap: wrap; gap: 0 16px; align-items: baseline; margin-bottom: 2px; }
+.act { font-size: 16px; }
+.act:hover, .act[aria-expanded="true"] { color: var(--ink); }
 .ref { border: 0; background: none; padding: 0; cursor: pointer; color: var(--rubric); font-size: 18px; font-family: var(--garamond); }
 .partial .ref::after { content: " · some words"; color: var(--quiet); }
+.notes { margin: 4px 0 0; }
 .why { font-size: 15px; font-style: italic; color: var(--quiet); }
-.why + .why::before { content: "· "; font-style: normal; }
+.why + .why::before { content: "·"; margin: 0 0.45em; font-style: normal; }
+button.why { border: 0; background: none; padding: 0; cursor: pointer; }
+button.why:hover { color: var(--ink); }
 .text, .context p { font: var(--fs)/var(--lh) var(--read); margin: 0; hanging-punctuation: first; }
 .w[data-s] { cursor: pointer; }
-.w[data-s]:hover { text-decoration: underline dotted 1px; text-underline-offset: 0.2em; }
-.m { text-decoration: underline 1.5px var(--rubric); text-underline-offset: 0.2em; }
-.m-synonym, .m-strongs, .m-typo, .m-prefix { text-decoration-style: dotted; text-decoration-thickness: 2px; }
+/* One quiet mark for every kind of match; the notes under the verse say which kind. */
+.m { text-decoration: underline 1px var(--quiet); text-underline-offset: 0.2em; }
 .m-stop { text-decoration: none; }
+@media (hover: hover) {
+  .w[data-s]:hover { text-decoration: underline 1px var(--ink); text-underline-offset: 0.2em; }
+}
 :root[data-italics="on"] .it { font-style: italic; }
 :root[data-red="on"] .wj { color: var(--rubric); }
 
@@ -170,7 +187,7 @@ bible-search[data-has-query] #intro { display: none; }
 .context h3 { margin: 0 0 6px; font: 400 15px var(--garamond); color: var(--quiet); font-variant-caps: all-small-caps; letter-spacing: 0.08em; }
 .context .title { font-style: italic; color: var(--quiet); margin-bottom: 6px; }
 .context p { padding: 1px 0; }
-.context p.here { background: var(--wash); box-shadow: -10px 0 0 var(--wash), 10px 0 0 var(--wash); }
+.context p.here { background: var(--here); box-shadow: -10px 0 0 var(--here), 10px 0 0 var(--here); }
 .context sup { font: 13px var(--garamond); color: var(--rubric); margin-right: 3px; cursor: pointer; vertical-align: 0.35em; }
 .context nav { display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; }
 .context nav button[data-read] { color: var(--rubric); }
@@ -202,7 +219,7 @@ bible-search[data-mode="read"] #more { display: none; }
   position: absolute; left: 0; width: 1.6em; text-align: right; top: 0.15em;
   font-size: 0.62em; line-height: inherit; color: var(--rubric); font-variant-numeric: oldstyle-nums;
 }
-.vl.here { background: var(--wash); box-shadow: 0 0 0 6px var(--wash); }
+.vl.here { background: var(--here); box-shadow: 0 0 0 6px var(--here); }
 :root[data-paragraphs="on"] .verses { font: var(--fs)/var(--lh) var(--read); }
 :root[data-paragraphs="on"] .vl { display: inline; padding: 0; margin: 0; }
 :root[data-paragraphs="on"] .vl sup { position: static; width: auto; margin: 0 0.15em 0 0.25em; vertical-align: 0.4em; }
@@ -282,6 +299,16 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--rubric); }
   #results { padding: 6px 18px 45vh; }
   .contents .books { columns: 1; }
   #lex { left: 0; right: 0; top: auto; bottom: 0; width: auto; max-height: 64dvh; }
+
+  /* Search box by the thumb: the header moves under the results, with the box itself lowest. */
+  :root[data-bottom="on"] bible-search { grid-template-rows: 1fr auto; }
+  :root[data-bottom="on"] bible-search > header {
+    order: 1; padding: 6px 18px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid var(--rule);
+  }
+  :root[data-bottom="on"] #status { order: -1; }
+  :root[data-bottom="on"] #search-form { order: 1; }
+  :root[data-bottom="on"] #q { border-bottom: 0; padding-bottom: 2px; }
+  :root[data-bottom="on"] bible-search[data-keyboard] #map-panel { display: none; }
 }
 @media (min-width: 861px) {
   bible-search[data-map="hidden"] main { grid-template-columns: minmax(340px, 42rem); justify-content: center; }

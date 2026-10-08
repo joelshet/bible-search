@@ -112,7 +112,7 @@ fn main() {
         }
         for (i, &v) in r.ids.iter().take(10).enumerate() {
             let v = v as usize;
-            println!("{:2}. {:7.2} {}  {}\n      {:?}", i + 1, r.scores[i], b.reference(v), b.verse_text(v), r.reasons(&b, v));
+            println!("{:2}. {:7.2} {}  {}\n      {:?}", i + 1, r.scores[i], b.reference(v), b.verse_text(v), r.reasons(&b, v).iter().map(|(text, _)| text.as_str()).collect::<Vec<_>>());
         }
         return;
     }

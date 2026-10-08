@@ -3,45 +3,47 @@
 pub struct Book {
     pub code: &'static str,
     pub name: &'static str,
+    /// What the map prints where the full name doesn't fit.
+    pub short: &'static str,
     pub aliases: &'static [&'static str],
 }
 
 macro_rules! books {
-    ($($code:literal $name:literal [$($a:literal)*]),* $(,)?) => {
-        pub const BOOKS: &[Book] = &[$(Book { code: $code, name: $name, aliases: &[$($a),*] }),*];
+    ($($code:literal $name:literal $short:literal [$($a:literal)*]),* $(,)?) => {
+        pub const BOOKS: &[Book] = &[$(Book { code: $code, name: $name, short: $short, aliases: &[$($a),*] }),*];
     };
 }
 
 books! {
-    "GEN" "Genesis" ["gen" "ge" "gn"], "EXO" "Exodus" ["exo" "ex" "exod"],
-    "LEV" "Leviticus" ["lev" "le" "lv"], "NUM" "Numbers" ["num" "nu" "nm" "nb"],
-    "DEU" "Deuteronomy" ["deut" "dt" "de" "deu"], "JOS" "Joshua" ["josh" "jos" "jsh"],
-    "JDG" "Judges" ["judg" "jdg" "jg" "jdgs"], "RUT" "Ruth" ["rth" "ru" "rut"],
-    "1SA" "1 Samuel" ["1sam" "1sa" "1sm" "1s"], "2SA" "2 Samuel" ["2sam" "2sa" "2sm" "2s"],
-    "1KI" "1 Kings" ["1kgs" "1ki" "1kin" "1k"], "2KI" "2 Kings" ["2kgs" "2ki" "2kin" "2k"],
-    "1CH" "1 Chronicles" ["1chr" "1ch" "1chron"], "2CH" "2 Chronicles" ["2chr" "2ch" "2chron"],
-    "EZR" "Ezra" ["ezr" "ez"], "NEH" "Nehemiah" ["neh" "ne"], "EST" "Esther" ["esth" "est" "es"],
-    "JOB" "Job" ["jb"], "PSA" "Psalms" ["ps" "psa" "psalm" "pslm" "psm" "pss"],
-    "PRO" "Proverbs" ["prov" "pro" "prv" "pr"], "ECC" "Ecclesiastes" ["eccl" "ecc" "ec" "qoh"],
-    "SNG" "Song of Solomon" ["song" "sos" "ss" "sng" "canticles" "songofsongs"],
-    "ISA" "Isaiah" ["isa" "is"], "JER" "Jeremiah" ["jer" "je" "jr"], "LAM" "Lamentations" ["lam" "la"],
-    "EZK" "Ezekiel" ["ezek" "eze" "ezk"], "DAN" "Daniel" ["dan" "da" "dn"], "HOS" "Hosea" ["hos" "ho"],
-    "JOL" "Joel" ["jl" "joe" "jol"], "AMO" "Amos" ["amo" "am"], "OBA" "Obadiah" ["obad" "ob" "oba"],
-    "JON" "Jonah" ["jon" "jnh"], "MIC" "Micah" ["mic" "mc"], "NAM" "Nahum" ["nah" "na" "nam"],
-    "HAB" "Habakkuk" ["hab" "hb"], "ZEP" "Zephaniah" ["zeph" "zep" "zp"], "HAG" "Haggai" ["hag" "hg"],
-    "ZEC" "Zechariah" ["zech" "zec" "zc"], "MAL" "Malachi" ["mal" "ml"],
-    "MAT" "Matthew" ["matt" "mt" "mat"], "MRK" "Mark" ["mrk" "mk" "mr"], "LUK" "Luke" ["luk" "lk"],
-    "JHN" "John" ["jn" "jhn" "joh"], "ACT" "Acts" ["act" "ac"], "ROM" "Romans" ["rom" "ro" "rm"],
-    "1CO" "1 Corinthians" ["1cor" "1co"], "2CO" "2 Corinthians" ["2cor" "2co"],
-    "GAL" "Galatians" ["gal" "ga"], "EPH" "Ephesians" ["eph" "ephes"],
-    "PHP" "Philippians" ["phil" "php" "pp"], "COL" "Colossians" ["col"],
-    "1TH" "1 Thessalonians" ["1thess" "1th" "1thes"], "2TH" "2 Thessalonians" ["2thess" "2th" "2thes"],
-    "1TI" "1 Timothy" ["1tim" "1ti"], "2TI" "2 Timothy" ["2tim" "2ti"], "TIT" "Titus" ["tit" "ti"],
-    "PHM" "Philemon" ["philem" "phm" "pm"], "HEB" "Hebrews" ["heb"], "JAS" "James" ["jas" "jm" "jam"],
-    "1PE" "1 Peter" ["1pet" "1pe" "1pt" "1p"], "2PE" "2 Peter" ["2pet" "2pe" "2pt" "2p"],
-    "1JN" "1 John" ["1jn" "1jo" "1jhn"], "2JN" "2 John" ["2jn" "2jo" "2jhn"],
-    "3JN" "3 John" ["3jn" "3jo" "3jhn"], "JUD" "Jude" ["jud" "jd"],
-    "REV" "Revelation" ["rev" "re" "rv" "revelations"],
+    "GEN" "Genesis" "Gen" ["gen" "ge" "gn"], "EXO" "Exodus" "Exod" ["exo" "ex" "exod"],
+    "LEV" "Leviticus" "Lev" ["lev" "le" "lv"], "NUM" "Numbers" "Num" ["num" "nu" "nm" "nb"],
+    "DEU" "Deuteronomy" "Deut" ["deut" "dt" "de" "deu"], "JOS" "Joshua" "Josh" ["josh" "jos" "jsh"],
+    "JDG" "Judges" "Judg" ["judg" "jdg" "jg" "jdgs"], "RUT" "Ruth" "Ruth" ["rth" "ru" "rut"],
+    "1SA" "1 Samuel" "1 Sam" ["1sam" "1sa" "1sm" "1s"], "2SA" "2 Samuel" "2 Sam" ["2sam" "2sa" "2sm" "2s"],
+    "1KI" "1 Kings" "1 Kgs" ["1kgs" "1ki" "1kin" "1k"], "2KI" "2 Kings" "2 Kgs" ["2kgs" "2ki" "2kin" "2k"],
+    "1CH" "1 Chronicles" "1 Chr" ["1chr" "1ch" "1chron"], "2CH" "2 Chronicles" "2 Chr" ["2chr" "2ch" "2chron"],
+    "EZR" "Ezra" "Ezra" ["ezr" "ez"], "NEH" "Nehemiah" "Neh" ["neh" "ne"], "EST" "Esther" "Esth" ["esth" "est" "es"],
+    "JOB" "Job" "Job" ["jb"], "PSA" "Psalms" "Ps" ["ps" "psa" "psalm" "pslm" "psm" "pss"],
+    "PRO" "Proverbs" "Prov" ["prov" "pro" "prv" "pr"], "ECC" "Ecclesiastes" "Eccl" ["eccl" "ecc" "ec" "qoh"],
+    "SNG" "Song of Solomon" "Song" ["song" "sos" "ss" "sng" "canticles" "songofsongs"],
+    "ISA" "Isaiah" "Isa" ["isa" "is"], "JER" "Jeremiah" "Jer" ["jer" "je" "jr"], "LAM" "Lamentations" "Lam" ["lam" "la"],
+    "EZK" "Ezekiel" "Ezek" ["ezek" "eze" "ezk"], "DAN" "Daniel" "Dan" ["dan" "da" "dn"], "HOS" "Hosea" "Hos" ["hos" "ho"],
+    "JOL" "Joel" "Joel" ["jl" "joe" "jol"], "AMO" "Amos" "Amos" ["amo" "am"], "OBA" "Obadiah" "Obad" ["obad" "ob" "oba"],
+    "JON" "Jonah" "Jonah" ["jon" "jnh"], "MIC" "Micah" "Mic" ["mic" "mc"], "NAM" "Nahum" "Nah" ["nah" "na" "nam"],
+    "HAB" "Habakkuk" "Hab" ["hab" "hb"], "ZEP" "Zephaniah" "Zeph" ["zeph" "zep" "zp"], "HAG" "Haggai" "Hag" ["hag" "hg"],
+    "ZEC" "Zechariah" "Zech" ["zech" "zec" "zc"], "MAL" "Malachi" "Mal" ["mal" "ml"],
+    "MAT" "Matthew" "Matt" ["matt" "mt" "mat"], "MRK" "Mark" "Mark" ["mrk" "mk" "mr"], "LUK" "Luke" "Luke" ["luk" "lk"],
+    "JHN" "John" "John" ["jn" "jhn" "joh"], "ACT" "Acts" "Acts" ["act" "ac"], "ROM" "Romans" "Rom" ["rom" "ro" "rm"],
+    "1CO" "1 Corinthians" "1 Cor" ["1cor" "1co"], "2CO" "2 Corinthians" "2 Cor" ["2cor" "2co"],
+    "GAL" "Galatians" "Gal" ["gal" "ga"], "EPH" "Ephesians" "Eph" ["eph" "ephes"],
+    "PHP" "Philippians" "Phil" ["phil" "php" "pp"], "COL" "Colossians" "Col" ["col"],
+    "1TH" "1 Thessalonians" "1 Thess" ["1thess" "1th" "1thes"], "2TH" "2 Thessalonians" "2 Thess" ["2thess" "2th" "2thes"],
+    "1TI" "1 Timothy" "1 Tim" ["1tim" "1ti"], "2TI" "2 Timothy" "2 Tim" ["2tim" "2ti"], "TIT" "Titus" "Titus" ["tit" "ti"],
+    "PHM" "Philemon" "Phlm" ["philem" "phm" "pm"], "HEB" "Hebrews" "Heb" ["heb"], "JAS" "James" "Jas" ["jas" "jm" "jam"],
+    "1PE" "1 Peter" "1 Pet" ["1pet" "1pe" "1pt" "1p"], "2PE" "2 Peter" "2 Pet" ["2pet" "2pe" "2pt" "2p"],
+    "1JN" "1 John" "1 John" ["1jn" "1jo" "1jhn"], "2JN" "2 John" "2 John" ["2jn" "2jo" "2jhn"],
+    "3JN" "3 John" "3 John" ["3jn" "3jo" "3jhn"], "JUD" "Jude" "Jude" ["jud" "jd"],
+    "REV" "Revelation" "Rev" ["rev" "re" "rv" "revelations"],
 }
 
 pub fn by_code(code: &str) -> Option<usize> {
