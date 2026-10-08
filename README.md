@@ -12,7 +12,7 @@ Then open http://localhost:8740. The `web/` folder is the whole site: static fil
 
 ## Rebuild it
 
-You only need this after changing `src/` or `data/`. It requires Rust with the `wasm32-unknown-unknown` target, plus `wasm-pack`.
+Run this after changing anything in `src/`, `data/`, or `web/`. Edits to `web/` need it too, because it stamps a new cache version into `web/sw.js`; browsers that have visited before keep serving the old files until that stamp changes. It requires Rust with the `wasm32-unknown-unknown` target, plus `wasm-pack`.
 
 ```sh
 ./build.sh
