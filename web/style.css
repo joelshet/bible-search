@@ -209,14 +209,12 @@ button.why:hover { color: var(--ink); }
 :root[data-italics="on"] .it { font-style: italic; }
 :root[data-red="on"] .wj { color: var(--rubric); }
 
-.context { margin: 14px 0 4px; }
-.context h3 { margin: 0 0 6px; font: 400 15px var(--garamond); color: var(--quiet); font-variant-caps: all-small-caps; letter-spacing: 0.08em; }
-.context .title { font-style: italic; color: var(--quiet); margin-bottom: 6px; }
-.context p { padding: 1px 0; }
-.context p.here { background: var(--here); box-shadow: -10px 0 0 var(--here), 10px 0 0 var(--here); }
-.context sup { font: 13px var(--garamond); color: var(--rubric); margin-right: 3px; cursor: pointer; vertical-align: 0.35em; }
-.context nav { display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; }
-.context nav button[data-read] { color: var(--rubric); }
+/* Context: a few verses above and below the hit's own text, which gets a verse number while they show. */
+.context p, .open .text { padding: 1px 0; }
+.open p.here { background: var(--here); box-shadow: -10px 0 0 var(--here), 10px 0 0 var(--here); }
+.hit sup { font: 13px var(--garamond); color: var(--rubric); margin-right: 3px; vertical-align: 0.35em; }
+.hit:not(.open) .text sup { display: none; }
+.context nav { margin-top: 6px; }
 .context nav button { font-style: italic; font-size: 16px; }
 #more { height: 1px; }
 .pilcrow { color: var(--rubric); }

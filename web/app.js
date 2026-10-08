@@ -570,7 +570,7 @@ function hitHtml(h) {
     <div class="hit-head"><button type="button" class="ref">${esc(h.ref)}</button>
       <button type="button" class="act" data-act="context" aria-expanded="false">context</button>
       <button type="button" class="act" data-read="${h.id}">read</button></div>
-    <p class="text">${versePlain(h.seg)}</p>${why ? `<p class="notes">${why}</p>` : ""}</li>`;
+    <p class="text" data-v="${h.id}"><sup>${h.v}</sup>${versePlain(h.seg)}</p>${why ? `<p class="notes">${why}</p>` : ""}</li>`;
 }
 
 function items() {
@@ -592,37 +592,45 @@ function select(i, scroll = true) {
   if (i >= all.length - 5) loadMore();
 }
 
+const AROUND = 3; // verses of context shown on each side of a hit, and added by "more"
+
 async function toggleContext(i) {
   const el = items()[i];
   if (!el) return;
-  const open = el.querySelector(".context");
   const button = el.querySelector('[data-act="context"]');
-  if (open) {
-    open.remove();
+  if (el.classList.contains("open")) {
+    for (const box of el.querySelectorAll(".context")) box.remove();
+    el.querySelector(".here")?.classList.remove("here");
+    el.classList.remove("open");
     button.setAttribute("aria-expanded", "false");
     openVerse = -1;
     return;
   }
-  const v = Number(el.dataset.v);
-  openVerse = v;
+  openVerse = Number(el.dataset.v);
+  el.classList.add("open");
+  el.querySelector(".text").classList.add("here");
   button.setAttribute("aria-expanded", "true");
-  const ctx = document.createElement("div");
-  ctx.className = "context";
-  el.append(ctx);
-  await renderChapter(ctx, v);
+  await renderContext(el, AROUND);
   syncUrl(true);
 }
 
-async function renderChapter(box, v) {
+// The verses around a hit, `around` on each side and never past its chapter. They go above
+// and below the hit's own text, so the verse you opened is still the one in the middle.
+async function renderContext(el, around) {
+  const v = Number(el.dataset.v);
   const ch = await ask("chapter", { verse: v });
-  if (!ch) return;
-  const title = ch.title ? `<p class="title">${esc(ch.title)}</p>` : "";
-  box.innerHTML = `<h3>${esc(ch.name)}</h3>${title}` +
-    ch.verses.map((x) => `<p data-v="${x.id}"${x.id === v ? ' class="here"' : ""}><sup>${x.v}</sup>${versePlain(x.seg)}</p>`).join("") +
-    `<nav>${ch.prev >= 0 ? `<button type="button" data-go="${ch.prev}">previous chapter</button>` : "<span></span>"}` +
-    `<button type="button" data-read="${v}">read from here</button>` +
-    `${ch.next >= 0 ? `<button type="button" data-go="${ch.next}">next chapter</button>` : "<span></span>"}</nav>`;
-  box.querySelector(".here")?.scrollIntoView({ block: "nearest" });
+  if (!ch || !el.classList.contains("open")) return;
+  for (const box of el.querySelectorAll(".context")) box.remove();
+  const at = ch.verses.findIndex((x) => x.id === v);
+  const before = ch.verses.slice(Math.max(0, at - around), at);
+  const after = ch.verses.slice(at + 1, at + 1 + around);
+  const html = (verses) => verses.map((x) => `<p data-v="${x.id}"><sup>${x.v}</sup>${versePlain(x.seg)}</p>`).join("");
+  const more = before.length + after.length + 1 < ch.verses.length
+    ? `<nav><button type="button" data-more="${around + AROUND}">more</button></nav>` : "";
+  const text = el.querySelector(".text");
+  if (before.length) text.insertAdjacentHTML("beforebegin", `<div class="context">${html(before)}</div>`);
+  if (after.length || more) text.insertAdjacentHTML("afterend", `<div class="context">${html(after)}${more}</div>`);
+  text.scrollIntoView({ block: "nearest" });
 }
 
 list.addEventListener("click", (e) => {
@@ -634,14 +642,7 @@ list.addEventListener("click", (e) => {
     select(i, false); // so Back from the reader lands on this hit
     return openReader(Number(t.closest("[data-read]").dataset.read));
   }
-  if (t.closest("[data-go]")) {
-    const v = Number(t.closest("[data-go]").dataset.go);
-    renderChapter(hit.querySelector(".context"), v);
-    focusVerse = v;
-    map?.setSelected(v);
-    syncUrl(true);
-    return;
-  }
+  if (t.closest("[data-more]")) return renderContext(hit, Number(t.closest("[data-more]").dataset.more));
   if (t.closest('.ref, [data-act="context"]')) {
     select(i, false);
     toggleContext(i);
@@ -652,7 +653,7 @@ list.addEventListener("click", (e) => {
     openLexicon(word.dataset.s || word.dataset.code);
     return;
   }
-  const p = t.closest(".context p[data-v]");
+  const p = t.closest(".open p[data-v]");
   if (p) {
     hit.querySelector(".here")?.classList.remove("here");
     p.classList.add("here");
