@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bible Search</title>
+<meta name="description" content="Search the King James Bible the way you remember it. Every verse, every Strong's number, in your browser.">
+<meta name="theme-color" content="#fbfaf7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e0e0e" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23fbfaf7'/%3E%3Cg fill='%23d9d5cc'%3E%3Crect x='4' y='4' width='11' height='9'/%3E%3Crect x='17' y='4' width='11' height='14'/%3E%3Crect x='4' y='15' width='11' height='13'/%3E%3C/g%3E%3Crect x='17' y='20' width='11' height='8' fill='%23b3261e'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<link rel="modulepreload" href="map.js">
+<link rel="modulepreload" href="reader.js">
+<link rel="preload" href="fonts/garamond.woff2" as="font" type="font/woff2" crossorigin>
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<bible-search>
+  <header>
+    <form role="search" id="search-form">
+      <label for="q" class="sr">Search the King James Bible</label>
+      <input id="q" type="search" autocomplete="off" autocapitalize="off" spellcheck="false"
+             enterkeyhint="search" placeholder="Search the way you remember it">
+      <span id="loading" aria-live="polite">Loading the Bible…</span>
+    </form>
+    <nav aria-label="Tools">
+      <button type="button" id="read-btn" title="Read the Bible (r)">read</button>
+      <button type="button" id="sort-btn" title="Sort order (s)">relevance</button>
+      <button type="button" id="map-btn" title="Show or hide the map (m)" aria-pressed="true">map</button>
+      <button type="button" id="qr-btn" title="QR code for this passage (q)">qr</button>
+      <button type="button" id="present-btn" title="Present this verse (p)">present</button>
+      <button type="button" id="settings-btn" title="Reading settings (,)" aria-label="Reading settings">Aa</button>
+      <button type="button" id="help-btn" title="Keyboard keys (?)" aria-label="Keyboard keys">?</button>
+    </nav>
+    <div id="status" aria-live="polite"></div>
+  </header>
+
+  <main>
+    <section id="results" aria-label="Results">
+      <div id="intro">
+        <p class="lede">Type a verse the way you remember it.</p>
+        <p>Modern wording is fine. The search knows the King James says <i>weary</i> where you'd say tired, and <i>charity</i> where Paul's Greek says agape.</p>
+        <p class="try">Try
+          <button type="button" data-q="eagles not getting tired">eagles not getting tired</button>,
+          <button type="button" data-q="plans to prosper you">plans to prosper you</button>,
+          <button type="button" data-q="do not worry about tomorrow">do not worry about tomorrow</button>,
+          <button type="button" data-q="agape">agape</button>,
+          <button type="button" data-q="ps 23">ps 23</button>, or
+          <button type="button" data-q="fear in:gospels">fear in:gospels</button>.</p>
+        <p>Or open the <button type="button" class="link" data-act="contents">contents</button> and read.</p>
+        <p class="quiet">Quotes find exact phrases, <code>in:john</code> narrows the search, and <code>G26</code> finds a Strong's number. Press <kbd>?</kbd> for the rest.</p>
+        <p class="credits">King James Version, 1769 text, with Strong's tagging from CrossWire and eBible.org. Strong's dictionaries from <a href="https://github.com/openscriptures/strongs">Open Scriptures</a> (CC BY-SA). Synonyms from <a href="https://wordnet.princeton.edu/">WordNet 3.0</a>, Princeton University. EB Garamond and Atkinson Hyperlegible fonts (OFL). Runs entirely in your browser and works offline after the first visit.</p>
+      </div>
+      <ol id="list"></ol>
+      <div id="more" aria-hidden="true"></div>
+      <div id="reader"></div>
+    </section>
+    <section id="map-panel" aria-label="Map of the whole Bible">
+      <canvas id="map" tabindex="0" aria-label="Map of every verse in the Bible. Drag to move, scroll or pinch to zoom, click a verse to open it."></canvas>
+      <div id="tip" hidden></div>
+      <div class="map-tools">
+        <button type="button" id="zoom-in" aria-label="Zoom in">+</button>
+        <button type="button" id="zoom-out" aria-label="Zoom out">−</button>
+        <button type="button" id="zoom-locate" title="Find the selected verse (l)">find</button>
+        <button type="button" id="zoom-reset" title="Whole Bible (0)">all</button>
+      </div>
+    </section>
+  </main>
+
+  <aside id="lex" hidden aria-label="Word study">
+    <button type="button" class="close" aria-label="Close word study">×</button>
+    <div id="lex-body"></div>
+  </aside>
+
+  <dialog id="present-dialog" aria-label="Present">
+    <figure>
+      <blockquote id="present-text"></blockquote>
+      <figcaption id="present-ref"></figcaption>
+    </figure>
+    <p class="hint">← → previous and next verse · f full screen · Esc to leave</p>
+  </dialog>
+
+  <dialog id="qr-dialog" aria-label="QR code">
+    <div id="qr-code"></div>
+    <p id="qr-label"></p>
+    <p id="qr-url"></p>
+    <form method="dialog"><button>Close</button></form>
+  </dialog>
+
+  <dialog id="settings-dialog" aria-label="Reading settings">
+    <form method="dialog" id="settings-form">
+      <h2>Reading settings</h2>
+      <fieldset><legend>Text size</legend>
+        <label><input type="radio" name="size" value="s"> Small</label>
+        <label><input type="radio" name="size" value="m"> Medium</label>
+        <label><input type="radio" name="size" value="l"> Large</label>
+        <label><input type="radio" name="size" value="xl"> Extra large</label>
+      </fieldset>
+      <fieldset><legend>Line spacing</legend>
+        <label><input type="radio" name="spacing" value="normal"> Normal</label>
+        <label><input type="radio" name="spacing" value="relaxed"> Relaxed</label>
+        <label><input type="radio" name="spacing" value="loose"> Loose</label>
+      </fieldset>
+      <fieldset><legend>Font</legend>
+        <label><input type="radio" name="font" value="serif"> EB Garamond</label>
+        <label><input type="radio" name="font" value="hyper"> Atkinson Hyperlegible</label>
+        <label><input type="radio" name="font" value="sans"> System sans</label>
+      </fieldset>
+      <fieldset><legend>Colors</legend>
+        <label><input type="radio" name="theme" value="auto"> Match device</label>
+        <label><input type="radio" name="theme" value="light"> Light</label>
+        <label><input type="radio" name="theme" value="dark"> Dark</label>
+      </fieldset>
+      <fieldset><legend>Focus</legend>
+        <label><input type="checkbox" name="ruler"> Reading ruler: dim every result except the selected one</label>
+        <label><input type="checkbox" name="italics"> Show translator-supplied words in italics, as printed KJVs do</label>
+        <label><input type="checkbox" name="red"> Words of Jesus in red</label>
+        <label><input type="checkbox" name="paragraphs"> Read in paragraphs instead of one verse per line</label>
+        <label><input type="checkbox" name="motion"> Animate the map when jumping to a verse</label>
+      </fieldset>
+      <button>Done</button>
+    </form>
+  </dialog>
+
+  <dialog id="help-dialog" aria-label="Keyboard keys">
+    <h2>Searching</h2>
+    <dl class="keys">
+      <dt><code>"exact words"</code></dt><dd>only verses with that phrase</dd>
+      <dt><code>in:john</code> <code>in:nt</code></dt><dd>narrow to a book or a group: ot, nt, law, history, poetry, prophets, gospels, paul, epistles</dd>
+      <dt><code>-word</code></dt><dd>leave out verses with that word</dd>
+      <dt><code>G26</code> <code>H430</code> <code>agape</code></dt><dd>every verse with that Greek or Hebrew word, however the KJV translated it</dd>
+      <dt><code>ps 23</code> <code>1 cor 13:4-7</code></dt><dd>go straight to a passage</dd>
+    </dl>
+    <h2>Keys</h2>
+    <dl class="keys">
+      <dt><kbd>/</kbd></dt><dd>search</dd>
+      <dt><kbd>↓</kbd> <kbd>↑</kbd> or <kbd>j</kbd> <kbd>k</kbd></dt><dd>move through results</dd>
+      <dt><kbd>Enter</kbd></dt><dd>open or close the chapter around a verse</dd>
+      <dt><kbd>r</kbd></dt><dd>read from the selected verse; <kbd>←</kbd> <kbd>→</kbd> change chapter, <kbd>c</kbd> contents</dd>
+      <dt><kbd>Esc</kbd></dt><dd>close, then clear, then leave the search box</dd>
+      <dt><kbd>p</kbd></dt><dd>present the selected verse full screen</dd>
+      <dt><kbd>q</kbd></dt><dd>QR code so others can open the same passage</dd>
+      <dt><kbd>l</kbd></dt><dd>find the selected verse on the map</dd>
+      <dt><kbd>m</kbd></dt><dd>show or hide the map</dd>
+      <dt><kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd></dt><dd>zoom the map (when it has focus)</dd>
+      <dt><kbd>s</kbd></dt><dd>switch between relevance and Bible order</dd>
+      <dt><kbd>,</kbd></dt><dd>reading settings</dd>
+    </dl>
+    <form method="dialog"><button>Close</button></form>
+  </dialog>
+</bible-search>
+</body>
+</html>
