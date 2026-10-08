@@ -20,7 +20,7 @@ Run this after changing anything in `src/`, `data/`, or `web/`. Edits to `web/` 
 ./target/release/eval target/index/bible.idx "eagles not getting tired"  # one query, with reasons
 ```
 
-`tools/prepare.py` downloads the three sources and flattens them into `data/*.tsv`. Its outputs are committed, so `build.sh` never touches the network.
+`tools/prepare.py` downloads the three sources and flattens them into `data/*.tsv`. Its outputs are committed, so `build.sh` never touches the network. `tools/icons.py` redraws the home-screen icons in `web/icons/`; they're committed too.
 
 ## How it works
 

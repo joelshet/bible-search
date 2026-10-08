@@ -125,7 +125,7 @@ header nav button, .map-tools button, .try button, #status button, dialog form >
 }
 header nav button:hover, header nav button:focus-visible, .map-tools button:hover { color: var(--ink); }
 #map-btn[aria-pressed="false"] { text-decoration: line-through; text-decoration-thickness: 1px; }
-#read-btn[aria-pressed="true"] { color: var(--ink); }
+#read-btn[aria-pressed="true"], #listen-btn[aria-pressed="true"] { color: var(--ink); }
 header nav button:disabled { opacity: 0.35; cursor: default; color: var(--quiet); }
 /* One line. Anything that doesn't fit scrolls sideways, and the right edge fades to say so. */
 #status {
