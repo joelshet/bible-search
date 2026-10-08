@@ -227,11 +227,24 @@ bible-search[data-mode="read"] #intro,
 bible-search[data-mode="read"] #list,
 bible-search[data-mode="read"] #more { display: none; }
 .reader-nav { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
-.reader-nav button {
+.reader-nav button, .reader-nav a {
   border: 0; background: none; padding: 0; cursor: pointer; color: var(--quiet); font-size: 17px;
   font-variant-caps: all-small-caps; letter-spacing: 0.06em;
 }
-.reader-nav button:hover { color: var(--ink); }
+.reader-nav a { text-decoration: none; }
+.reader-nav button:hover, .reader-nav a:hover { color: var(--ink); }
+
+/* The ESV, alone or beside the King James. Its line breaks are the translation's own. */
+.esv { white-space: pre-line; }
+#reader .chapter[data-version="both"] .vl { display: block; padding: 0 0 0 2.1em; margin: 0 0 0.6em; }
+#reader .chapter[data-version="both"] .vl sup { position: absolute; width: 1.6em; margin: 0; vertical-align: baseline; }
+#reader .chapter[data-version="both"] .esv { display: block; margin-top: 0.2em; padding-left: 0.8em; border-left: 1px solid var(--rule); }
+.versions { display: none; }
+.esv-note { color: var(--quiet); font-size: 15px; font-variant-caps: all-small-caps; letter-spacing: 0.06em; text-align: center; }
+fieldset.key label { flex-wrap: wrap; }
+fieldset.key input { flex: 1 1 14rem; border: 0; border-bottom: 1px solid var(--rule); background: none; padding: 2px 0; outline: none; }
+fieldset.key input:focus { border-bottom-color: var(--ink); }
+fieldset.key p { margin: 0; color: var(--quiet); font-size: 15px; }
 .chapter { margin: 0 0 64px; }
 .chapter > header { display: flex; flex-direction: column; align-items: center; margin: 28px 0 22px; }
 .chapter > header .book { font-variant-caps: all-small-caps; letter-spacing: 0.14em; color: var(--quiet); font-size: 18px; }
@@ -362,4 +375,17 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--rubric); }
   }
   bible-search[data-map="hidden"] main { grid-template-columns: minmax(340px, 42rem) auto; justify-content: center; }
   bible-search[data-map="hidden"] #map-panel { display: none; }
+
+  /* Two translations side by side, verse against verse, in the room the map leaves. */
+  bible-search[data-mode="read"][data-version="both"][data-map="hidden"] main { grid-template-columns: minmax(340px, 76rem) auto; }
+  bible-search[data-version="both"][data-map="hidden"] #reader { max-width: none; }
+  bible-search[data-map="hidden"] #reader .chapter[data-version="both"] .vl,
+  bible-search[data-map="hidden"] #reader .chapter[data-version="both"] .versions {
+    display: grid; grid-template-columns: 1fr 1fr; column-gap: 44px;
+  }
+  bible-search[data-map="hidden"] #reader .chapter[data-version="both"] .esv { margin: 0; padding: 0; border: 0; }
+  bible-search[data-map="hidden"] .versions {
+    padding-left: 2.1em; margin: 0 0 10px; color: var(--quiet); font-size: 15px;
+    font-variant-caps: all-small-caps; letter-spacing: 0.08em;
+  }
 }

@@ -28,7 +28,7 @@ let reqId = 0;
 
 const narrow = matchMedia("(max-width: 860px)");
 // mapRead: null means "hide while reading on a phone, show on a laptop".
-const defaults = { size: "m", spacing: "normal", font: "serif", theme: "auto", ruler: false, italics: true, red: false, paragraphs: false, motion: false, bottom: false, rate: 1, sort: "relevance", map: true, mapRead: null };
+const defaults = { size: "m", spacing: "normal", font: "serif", theme: "auto", ruler: false, italics: true, red: false, paragraphs: false, motion: false, bottom: false, rate: 1, version: "kjv", esvKey: "", sort: "relevance", map: true, mapRead: null };
 let settings = { ...defaults };
 try {
   Object.assign(settings, JSON.parse(localStorage.getItem("bible-settings") || "{}"));
@@ -44,6 +44,7 @@ function applySettings() {
   root.dataset.red = settings.red ? "on" : "off";
   root.dataset.paragraphs = settings.paragraphs ? "on" : "off";
   root.dataset.bottom = settings.bottom ? "on" : "off";
+  shell.dataset.version = version();
   fitKeyboard();
   const showMap = mapShown();
   shell.dataset.map = showMap ? "shown" : "hidden";
@@ -58,9 +59,11 @@ function applySettings() {
   }
 }
 
+// Reading hides the map by default where it would crowd the text: on a phone, and when two
+// translations sit side by side.
 function mapShown() {
   if (mode !== "read") return settings.map;
-  return settings.mapRead ?? !narrow.matches;
+  return settings.mapRead ?? !(narrow.matches || version() === "both");
 }
 
 function mapColors() {
@@ -136,6 +139,10 @@ function ready(m) {
     ask,
     meta,
     verseHtml: versePlain,
+    version,
+    versionLabel: () => (settings.esvKey ? VERSIONS[settings.version] : ""),
+    esv: esvChapter,
+    esc,
     onVerse: (v, explicit) => {
       focusVerse = v;
       syncRail();
@@ -401,6 +408,12 @@ $("reader").addEventListener("click", (e) => {
   const t = e.target;
   if (followGo(e)) return;
   if (t.closest('[data-act="contents"]')) return openContents();
+  if (t.closest('[data-act="version"]')) {
+    const names = Object.keys(VERSIONS);
+    settings.version = names[(names.indexOf(settings.version) + 1) % names.length];
+    applySettings();
+    return reader.open(Math.max(focusVerse, 0));
+  }
   const word = t.closest(".w[data-s]");
   if (word) return openLexicon(word.dataset.s);
   const line = t.closest(".vl");
@@ -721,6 +734,42 @@ $("lex").addEventListener("click", (e) => {
   if (e.target.closest(".close")) $("lex").hidden = true;
 });
 
+// ---------- the ESV, for readers who add their own key ----------
+
+// Crossway's API serves the ESV to personal, non-commercial sites. Its terms allow at most
+// 500 verses or half a book on a page or in a cache, so the ESV shows one chapter at a
+// time and only the last chapter fetched is kept, in memory.
+const VERSIONS = { kjv: "King James", both: "King James + ESV", esv: "ESV" };
+const version = () => (settings.esvKey ? settings.version : "kjv");
+let esvKept = { c: -1, verses: null };
+
+async function esvChapter(c) {
+  if (esvKept.c === c) return esvKept.verses;
+  const b = meta.chapterBook[c];
+  const oneChapter = meta.chapterBook.filter((x) => x === b).length === 1;
+  const params = new URLSearchParams({
+    q: meta.books[b][1] + (oneChapter ? "" : ` ${meta.chapterNum[c]}`), // "Jude 1" would mean verse 1
+    "include-passage-references": false, "include-footnotes": false, "include-headings": false,
+    "include-short-copyright": false, "indent-paragraphs": 0, "indent-poetry": false,
+    "indent-declares": 0, "indent-psalm-doxology": 0,
+  });
+  let res;
+  try {
+    res = await fetch(`https://api.esv.org/v3/passage/text/?${params}`, { headers: { Authorization: `Token ${settings.esvKey}` } });
+  } catch {
+    throw new Error("no connection");
+  }
+  if (!res.ok) {
+    throw new Error(res.status === 401 || res.status === 403 ? "the key was refused" : res.status === 429 ? "too many requests for now" : `error ${res.status}`);
+  }
+  // The text arrives as "[1] In the beginning… [2] The earth was…", line breaks included.
+  const parts = (await res.json()).passages.join("\n").split(/\[(\d+)\]/);
+  const verses = new Map();
+  for (let i = 1; i < parts.length; i += 2) verses.set(Number(parts[i]), parts[i + 1].trim());
+  esvKept = { c, verses };
+  return verses;
+}
+
 // ---------- listening ----------
 
 // The device's own voice reads on from the current verse, one verse per utterance, so the
@@ -860,13 +909,16 @@ function openSettings() {
     if (!els) continue;
     if (els.type === "checkbox") els.checked = !!v;
     else if (els.length) for (const r of els) r.checked = r.value === v;
+    else els.value = v;
   }
   $("settings-dialog").showModal();
 }
 $("settings-form").addEventListener("change", (e) => {
   const t = e.target;
-  settings[t.name] = t.type === "checkbox" ? t.checked : t.value;
+  settings[t.name] = t.type === "checkbox" ? t.checked : t.value.trim();
   applySettings();
+  // A key added or removed changes what the reader can show.
+  if (t.name === "esvKey" && mode === "read" && focusVerse >= 0) reader.open(focusVerse);
 });
 $("settings-btn").onclick = openSettings;
 $("help-btn").onclick = () => $("help-dialog").showModal();

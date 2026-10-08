@@ -45,10 +45,11 @@ Run this after changing anything in `src/`, `data/`, or `web/`. Edits to `web/` 
 
   > Permission to use, copy, modify and distribute this software and database and its documentation for any purpose and without fee or royalty is hereby granted, provided that you agree to comply with the following copyright notice and statements, including the disclaimer, and that the same appear on ALL copies of the software, database and documentation, including modifications that you make for internal use or for distribution. WordNet 3.0 Copyright 2006 by Princeton University. All rights reserved. THIS SOFTWARE AND DATABASE IS PROVIDED "AS IS" AND PRINCETON UNIVERSITY MAKES NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR IMPLIED. BY WAY OF EXAMPLE, BUT NOT LIMITATION, PRINCETON UNIVERSITY MAKES NO REPRESENTATIONS OR WARRANTIES OF MERCHANTABILITY OR FITNESS FOR ANY PARTICULAR PURPOSE OR THAT THE USE OF THE LICENSED SOFTWARE, DATABASE OR DOCUMENTATION WILL NOT INFRINGE ANY THIRD PARTY PATENTS, COPYRIGHTS, TRADEMARKS OR OTHER RIGHTS. The name of Princeton University or Princeton may not be used in advertising or publicity pertaining to distribution of the software and/or database. Title to copyright in this software, database and any associated documentation shall at all times remain with Princeton University and LICENSEE agrees to preserve same.
 
+- English Standard Version: not included. Readers who add their own key from api.esv.org see it fetched from Crossway's ESV API, one chapter at a time, under that API's terms for personal, non-commercial use.
 - EB Garamond font: The EB Garamond Project Authors, SIL Open Font License (`web/fonts/OFL-garamond.txt`).
 - Atkinson Hyperlegible font: Braille Institute, SIL Open Font License (`web/fonts/OFL-atkinson.txt`).
 - `qrcodegen` (Project Nayuki, MIT) and `wasm-bindgen` (MIT/Apache-2.0) are the only Rust dependencies.
 
 ## Outside this folder
 
-Nothing at runtime. Visitors' browsers keep a service-worker cache and their reading settings in local storage for this site. For local previews, `~/repos/.claude/launch.json` has a `bible-app` entry; delete that entry to remove it.
+Nothing at runtime, with one exception: a reader who adds an ESV API key in the settings has ESV chapters fetched from `api.esv.org` as they read. Removing the key stops it. Visitors' browsers keep a service-worker cache and their reading settings in local storage for this site. For local previews, `~/repos/.claude/launch.json` has a `bible-app` entry; delete that entry to remove it.

@@ -3,13 +3,18 @@
 const AHEAD = 2000; // how far past the bottom of the screen chapters are loaded, in pixels
 
 export class Reader {
-  constructor(box, scroller, { ask, meta, verseHtml, onVerse }) {
+  // version() is "kjv", "both", or "esv"; esv(c) resolves to a chapter's ESV verses by number.
+  constructor(box, scroller, { ask, meta, verseHtml, onVerse, version, versionLabel, esv, esc }) {
     this.box = box;
     this.scroller = scroller;
     this.ask = ask;
     this.meta = meta;
     this.verseHtml = verseHtml;
     this.onVerse = onVerse;
+    this.version = version;
+    this.versionLabel = versionLabel;
+    this.esv = esv;
+    this.esc = esc;
     this.first = -1; // first and last chapter currently rendered
     this.last = -1;
     this.loading = false;
@@ -50,14 +55,36 @@ export class Reader {
     const ch = await this.ask("chapter", { verse: m.chapterStart[c] });
     const book = m.books[m.chapterBook[c]][1];
     const single = !m.chapterBook.some((b, i) => b === m.chapterBook[c] && i !== c);
+    let version = this.version();
+    let esv = null;
+    let note = "";
+    if (version !== "kjv") {
+      try {
+        esv = await this.esv(c);
+        note = `ESV · <a href="https://www.esv.org" target="_blank" rel="noopener">esv.org</a>`;
+      } catch (e) {
+        version = "kjv";
+        note = `The ESV didn't load (${this.esc(e.message)}). This is the King James.`;
+      }
+    }
+    const last = ch.verses.length;
+    const esvText = (n) => {
+      // Where the ESV numbers a verse the King James doesn't have, it joins the last one.
+      const parts = [esv.get(n) || ""];
+      if (n === last) for (const [k, text] of esv) if (k > last) parts.push(text);
+      return `<span class="esv">${this.esc(parts.join(" "))}</span>`;
+    };
     const verses = ch.verses.map((x) => {
       const para = x.seg[0]?.[0]?.startsWith("¶") ? " para" : "";
-      return `<p class="vl${para}" data-v="${x.id}"><sup>${x.v}</sup>${this.verseHtml(x.seg)}</p>`;
+      const kjv = this.verseHtml(x.seg);
+      const text = version === "kjv" ? kjv : version === "esv" ? esvText(x.v) : `<span class="kjv">${kjv}</span>${esvText(x.v)}`;
+      return `<p class="vl${para}" data-v="${x.id}"><sup>${x.v}</sup>${text}</p>`;
     }).join("");
-    return `<section class="chapter" data-c="${c}">
+    const heads = version === "both" ? `<p class="versions"><span>King James</span><span>ESV</span></p>` : "";
+    return `<section class="chapter" data-c="${c}" data-version="${version}">
       <header><span class="book">${book}</span>${single ? "" : `<span class="num">${m.chapterNum[c]}</span>`}</header>
-      ${ch.title ? `<p class="title">${ch.title}</p>` : ""}
-      <div class="verses">${verses}</div></section>`;
+      ${ch.title && version !== "esv" ? `<p class="title">${ch.title}</p>` : ""}
+      <div class="verses">${heads}${verses}</div>${note ? `<p class="esv-note">${note}</p>` : ""}</section>`;
   }
 
   // Open the reader at verse v: its chapter, scrolled so v sits near the top.
@@ -70,7 +97,12 @@ export class Reader {
     const prev = c > 0
       ? `<button type="button" class="prev-chapter" data-go="${this.meta.chapterStart[c - 1]}">${this.label(c - 1)}</button>`
       : "";
-    this.box.innerHTML = `<nav class="reader-nav"><button type="button" data-act="contents">contents</button>${prev}</nav>${html}`;
+    const label = this.versionLabel();
+    const version = label ? `<button type="button" data-act="version" title="Change translation">${label}</button>` : "";
+    // The ESV's terms keep it to one chapter on a page, so it gets a link onward instead of a longer scroll.
+    const next = this.version() !== "kjv" && c + 1 < this.chapterCount()
+      ? `<nav class="reader-nav"><span></span>${this.chapterLink(c + 1, this.label(c + 1))}</nav>` : "";
+    this.box.innerHTML = `<nav class="reader-nav"><button type="button" data-act="contents">contents</button>${version}${prev}</nav>${html}${next}`;
     this.box.append(this.sentinel);
     this.mark(v);
     const el = this.box.querySelector(`[data-v="${v}"]`);
@@ -85,6 +117,7 @@ export class Reader {
   }
 
   async appendNext() {
+    if (this.version() !== "kjv") return;
     if (this.loading || this.last < 0 || this.last + 1 >= this.chapterCount()) return;
     this.loading = true;
     const token = this.token;
