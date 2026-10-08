@@ -20,13 +20,14 @@ let focusVerse = -1;        // verse id the URL, map, QR, and present mode refer
 let requests = new Map();
 let reader = null;
 let mode = "search";        // or "read"
+let listScroll = 0;         // where the results were scrolled to when reading began
 let reqId = 0;
 
 // ---------- settings (remembered per browser) ----------
 
 const narrow = matchMedia("(max-width: 860px)");
 // mapRead: null means "hide while reading on a phone, show on a laptop".
-const defaults = { size: "m", spacing: "normal", font: "serif", theme: "auto", ruler: false, italics: true, red: false, paragraphs: false, motion: false, sort: "relevance", map: true, mapRead: null };
+const defaults = { size: "m", spacing: "normal", font: "serif", theme: "auto", ruler: false, italics: true, red: false, paragraphs: false, motion: false, bottom: false, sort: "relevance", map: true, mapRead: null };
 let settings = { ...defaults };
 try {
   Object.assign(settings, JSON.parse(localStorage.getItem("bible-settings") || "{}"));
@@ -41,6 +42,8 @@ function applySettings() {
   root.dataset.italics = settings.italics ? "on" : "off";
   root.dataset.red = settings.red ? "on" : "off";
   root.dataset.paragraphs = settings.paragraphs ? "on" : "off";
+  root.dataset.bottom = settings.bottom ? "on" : "off";
+  fitKeyboard();
   const showMap = mapShown();
   shell.dataset.map = showMap ? "shown" : "hidden";
   $("map-btn").setAttribute("aria-pressed", String(showMap));
@@ -68,6 +71,28 @@ function mapColors() {
     dark: css.colorScheme === "dark" || css.getPropertyValue("color-scheme").trim() === "dark",
   };
 }
+
+// A search box at the bottom sits where the phone keyboard opens. While that setting is on,
+// the app is sized to the part of the screen the keyboard leaves, and the map gives its
+// band to the results while the keyboard is up.
+const vv = window.visualViewport;
+let fullHeight = 0;
+let fullWidth = 0;
+function fitKeyboard() {
+  if (!vv || !settings.bottom || !narrow.matches || Math.abs(vv.scale - 1) > 0.01) {
+    root.style.removeProperty("--app-height");
+    shell.removeAttribute("data-keyboard");
+    return;
+  }
+  if (vv.width !== fullWidth) fullHeight = 0; // the phone was turned
+  fullWidth = vv.width;
+  fullHeight = Math.max(fullHeight, vv.height);
+  root.style.setProperty("--app-height", `${vv.height}px`);
+  shell.toggleAttribute("data-keyboard", vv.height < fullHeight - 120);
+  scrollTo(0, 0);
+}
+vv?.addEventListener("resize", fitKeyboard);
+vv?.addEventListener("scroll", fitKeyboard);
 
 // ---------- worker plumbing ----------
 
@@ -132,7 +157,9 @@ let layoutAspect = 0;
 let layoutBusy = false;
 async function fitLayout() {
   const { width, height } = $("map-panel").getBoundingClientRect();
-  if (!meta || !width || !height || layoutBusy) return;
+  if (!meta || !width || !height) return;
+  clearMapTools();
+  if (layoutBusy) return;
   const aspect = Math.min(3, Math.max(0.5, width / height));
   if (layoutAspect && Math.abs(Math.log(aspect / layoutAspect)) < 0.2) return;
   layoutBusy = true;
@@ -161,6 +188,16 @@ async function fitLayout() {
   map.setFont(getComputedStyle(root).getPropertyValue("--read"));
   map.setHits(lastHits);
   map.setSelected(focusVerse);
+  clearMapTools();
+}
+
+// Book labels stay out from under the zoom buttons.
+function clearMapTools() {
+  if (!map) return;
+  const panel = $("map").getBoundingClientRect();
+  const tools = document.querySelector(".map-tools").getBoundingClientRect();
+  map.keepClear = [[tools.left - panel.left - 6, tools.top - panel.top, tools.right - panel.left, tools.bottom - panel.top]];
+  map.draw();
 }
 
 // ---------- verse ids ----------
@@ -223,29 +260,45 @@ let pauseTimer = 0;
 
 function restoreFromUrl() {
   const p = new URLSearchParams(location.search);
-  input.value = p.get("q") || "";
+  const q = p.get("q") || "";
+  // Results still on the page stay as they are, so Back returns to the same hit,
+  // scroll position, and open chapter.
+  const kept = q !== "" && q === shown.q.trim();
+  input.value = q;
   if (p.has("read")) {
     const v = parseUrlRef(p.get("read"));
-    runSearch(false);
+    if (!kept) runSearch(false);
     if (v >= 0) openReader(v, false);
     else openContents(false);
     return;
   }
   setMode("search");
   focusVerse = parseUrlRef(p.get("v"));
+  if (kept) {
+    const i = [...items()].findIndex((el) => Number(el.dataset.v) === focusVerse);
+    if (i >= 0) select(i, false);
+    else map?.setSelected(focusVerse);
+    return;
+  }
   pendingOpen = input.value ? focusVerse : -1;
   runSearch(false);
   if (!input.value && focusVerse >= 0) openReader(focusVerse, false);
 }
-window.addEventListener("popstate", () => meta && restoreFromUrl());
+window.addEventListener("popstate", () => {
+  lastPushed = ""; // after Back, opening the same verse again must add a step, not replace this one
+  if (meta) restoreFromUrl();
+});
 
 // ---------- reading ----------
 
 function setMode(m) {
   const changed = m !== mode;
+  // Results and the reader scroll in the same box, so the results' place is kept by hand.
+  if (changed && m === "read") listScroll = $("results").scrollTop;
   mode = m;
   shell.dataset.mode = m;
   if (changed) applySettings(); // only the map's visibility depends on the mode
+  if (changed && m === "search") $("results").scrollTop = listScroll;
   $("read-btn").textContent = m === "read" && input.value.trim() ? "results" : "read";
 }
 
@@ -323,6 +376,7 @@ function runSearch(live) {
     searchId++;
     shown = { id: searchId, total: 0, loaded: 0, q: "" };
     if (pendingOpen < 0) list.innerHTML = "";
+    resetListScroll();
     status.textContent = "";
     selected = -1;
     lastHits = null;
@@ -349,6 +403,12 @@ $("search-form").addEventListener("submit", (e) => {
   syncUrl(true);
 });
 
+// New results start at the top, including ones that arrive while the reader is showing.
+function resetListScroll() {
+  if (mode === "search") $("results").scrollTop = 0;
+  else listScroll = 0;
+}
+
 function fmtTime(ms) {
   if (ms <= 0) return "under 1 ms";
   if (ms < 1) return `${Math.max(1, Math.round(ms * 1000))} µs`;
@@ -373,13 +433,15 @@ function showResults(m) {
   else if (s.terms > 1) add(`${s.full.toLocaleString()} with every word · ${plural(s.total, "verse")} with some · ${plural(s.books, "book")}`);
   else if (s.literal && s.literal < s.total) add(`${plural(s.literal, "verse")} with “${esc(s.word)}” · ${s.total.toLocaleString()} counting related words · ${plural(s.books, "book")}`);
   else add(`${plural(s.total, "verse")} · ${plural(s.books, "book")}`);
-  add(`search ${fmtTime(m.ms)}`);
   for (const n of s.notes) add(`spelling: ${esc(n)}`, "note");
   if (s.book) {
     const b = add(`<button type="button">Open ${esc(s.book.name)} 1</button>`);
     b.querySelector("button").onclick = () => openReader(s.book.first);
   }
+  add(`search ${fmtTime(m.ms)}`);
+  status.scrollLeft = 0;
   list.innerHTML = m.page.map(hitHtml).join("");
+  resetListScroll();
   selected = -1;
   openVerse = -1;
   lastHits = m.hits;
@@ -426,11 +488,16 @@ function segHtml(seg) {
 }
 const versePlain = (segs) => segs.map(segHtml).join("");
 
+// A hit reads top to bottom: where it is and what you can do there, the verse, then why it matched.
 function hitHtml(h) {
-  const why = (h.why || []).map((w) => `<span class="why">${esc(w)}</span>`).join("");
+  const why = (h.why || []).map(([text, code]) => code
+    ? `<button type="button" class="why" data-code="${code}">${esc(text)}</button>`
+    : `<span class="why">${esc(text)}</span>`).join("");
   return `<li class="hit${h.full ? "" : " partial"}" data-v="${h.id}">
-    <div class="hit-head"><button type="button" class="ref" aria-expanded="false">${esc(h.ref)}</button>${why}</div>
-    <p class="text">${versePlain(h.seg)}</p></li>`;
+    <div class="hit-head"><button type="button" class="ref">${esc(h.ref)}</button>
+      <button type="button" class="act" data-act="context" aria-expanded="false">context</button>
+      <button type="button" class="act" data-read="${h.id}">read</button></div>
+    <p class="text">${versePlain(h.seg)}</p>${why ? `<p class="notes">${why}</p>` : ""}</li>`;
 }
 
 function items() {
@@ -456,15 +523,16 @@ async function toggleContext(i) {
   const el = items()[i];
   if (!el) return;
   const open = el.querySelector(".context");
+  const button = el.querySelector('[data-act="context"]');
   if (open) {
     open.remove();
-    el.querySelector(".ref").setAttribute("aria-expanded", "false");
+    button.setAttribute("aria-expanded", "false");
     openVerse = -1;
     return;
   }
   const v = Number(el.dataset.v);
   openVerse = v;
-  el.querySelector(".ref").setAttribute("aria-expanded", "true");
+  button.setAttribute("aria-expanded", "true");
   const ctx = document.createElement("div");
   ctx.className = "context";
   el.append(ctx);
@@ -489,7 +557,10 @@ list.addEventListener("click", (e) => {
   const hit = t.closest(".hit");
   if (!hit) return;
   const i = [...items()].indexOf(hit);
-  if (t.closest("[data-read]")) return openReader(Number(t.closest("[data-read]").dataset.read));
+  if (t.closest("[data-read]")) {
+    select(i, false); // so Back from the reader lands on this hit
+    return openReader(Number(t.closest("[data-read]").dataset.read));
+  }
   if (t.closest("[data-go]")) {
     const v = Number(t.closest("[data-go]").dataset.go);
     renderChapter(hit.querySelector(".context"), v);
@@ -498,14 +569,14 @@ list.addEventListener("click", (e) => {
     syncUrl(true);
     return;
   }
-  if (t.closest(".ref")) {
+  if (t.closest('.ref, [data-act="context"]')) {
     select(i, false);
     toggleContext(i);
     return;
   }
-  const word = t.closest(".w[data-s]");
+  const word = t.closest(".w[data-s], .why[data-code]");
   if (word) {
-    openLexicon(word.dataset.s);
+    openLexicon(word.dataset.s || word.dataset.code);
     return;
   }
   const p = t.closest(".context p[data-v]");
@@ -677,7 +748,7 @@ document.addEventListener("keydown", (e) => {
     else if (k === "Escape") {
       e.preventDefault();
       if (!$("lex").hidden) $("lex").hidden = true;
-      else if (input.value) { input.value = ""; focusVerse = -1; runSearch(false); syncUrl(true); }
+      else if (input.value) { input.value = ""; focusVerse = -1; runSearch(false); setMode(mode); syncUrl(true); }
       else input.blur();
     }
     return;

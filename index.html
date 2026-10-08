@@ -48,6 +48,7 @@
           <button type="button" data-q="ps 23">ps 23</button>, or
           <button type="button" data-q="fear in:gospels">fear in:gospels</button>.</p>
         <p>Or open the <button type="button" class="link" data-act="contents">contents</button> and read.</p>
+        <p>On a result, <i>context</i> opens the chapter around the verse and <i>read</i> starts reading there; going back returns you to the result. Tap any word, or a note under the verse, for the Hebrew or Greek behind it.</p>
         <p class="quiet">Quotes find exact phrases, <code>in:john</code> narrows the search, and <code>G26</code> finds a Strong's number. Press <kbd>?</kbd> for the rest.</p>
         <p class="credits">King James Version, 1769 text, with Strong's tagging from CrossWire and eBible.org. Strong's dictionaries from <a href="https://github.com/openscriptures/strongs">Open Scriptures</a> (CC BY-SA). Synonyms from <a href="https://wordnet.princeton.edu/">WordNet 3.0</a>, Princeton University. EB Garamond and Atkinson Hyperlegible fonts (OFL). Runs entirely in your browser and works offline after the first visit.</p>
       </div>
@@ -118,6 +119,9 @@
         <label><input type="checkbox" name="paragraphs"> Read in paragraphs instead of one verse per line</label>
         <label><input type="checkbox" name="motion"> Animate the map when jumping to a verse</label>
       </fieldset>
+      <fieldset><legend>On a phone</legend>
+        <label><input type="checkbox" name="bottom"> Search box at the bottom of the screen, by your thumb</label>
+      </fieldset>
       <button>Done</button>
     </form>
   </dialog>
@@ -130,6 +134,12 @@
       <dt><code>-word</code></dt><dd>leave out verses with that word</dd>
       <dt><code>G26</code> <code>H430</code> <code>agape</code></dt><dd>every verse with that Greek or Hebrew word, however the KJV translated it</dd>
       <dt><code>ps 23</code> <code>1 cor 13:4-7</code></dt><dd>go straight to a passage</dd>
+    </dl>
+    <h2>On a result</h2>
+    <dl class="keys">
+      <dt>context</dt><dd>the chapter around the verse, opened in place</dd>
+      <dt>read</dt><dd>start reading there; going back returns you to the result</dd>
+      <dt>a word or a note</dt><dd>the Hebrew or Greek word behind it</dd>
     </dl>
     <h2>Keys</h2>
     <dl class="keys">
