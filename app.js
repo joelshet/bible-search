@@ -7,13 +7,14 @@ const shell = document.querySelector("bible-search");
 const input = $("q");
 const list = $("list");
 const status = $("status");
+const tryLine = status.firstElementChild; // the example searches, written in index.html
 const PAGE = 40;
 
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 let meta = null;
 let map = null;
 let searchId = 0;
-let shown = { id: 0, total: 0, loaded: 0, q: "" };
+let shown = { id: 0, total: 0, loaded: 0, q: "", summary: null, ms: 0 };
 let selected = -1;          // index into the result list
 let openVerse = -1;         // verse whose chapter is expanded
 let focusVerse = -1;        // verse id the URL, map, QR, and present mode refer to
@@ -302,7 +303,7 @@ function setMode(m) {
   if (changed) applySettings(); // only the map's visibility depends on the mode
   if (changed && m === "search") $("results").scrollTop = listScroll;
   syncRail();
-  $("read-btn").textContent = m === "read" && input.value.trim() ? "results" : "read";
+  if (changed) showPlace();
 }
 
 function openReader(v, push = true) {
@@ -354,15 +355,17 @@ function lastRead() {
 }
 
 $("read-btn").onclick = () => {
-  if (mode === "read" && input.value.trim()) {
-    setMode("search");
-    focusVerse = -1;
-    syncUrl(true);
-    return;
-  }
+  if (mode === "read") return leaveReader();
   const v = currentVerse() >= 0 ? currentVerse() : lastRead();
   v >= 0 ? openReader(v) : openContents();
 };
+
+// Back to the results, or to the home view when there was no search.
+function leaveReader() {
+  setMode("search");
+  focusVerse = -1;
+  syncUrl(true);
+}
 
 // A click on a chapter link or button opens it here. With a modifier key the link's
 // own address opens in a new tab or window instead.
@@ -413,10 +416,10 @@ function runSearch(live) {
   if (!q.trim()) {
     worker.postMessage({ type: "clear" });
     searchId++;
-    shown = { id: searchId, total: 0, loaded: 0, q: "" };
+    shown = { id: searchId, total: 0, loaded: 0, q: "", summary: null, ms: 0 };
     if (pendingOpen < 0) list.innerHTML = "";
     resetListScroll();
-    status.textContent = "";
+    showPlace();
     selected = -1;
     lastHits = null;
     map?.setHits(null);
@@ -424,6 +427,20 @@ function runSearch(live) {
   }
   worker.postMessage({ type: "search", id: ++searchId, q, live, canonical: settings.sort === "canonical", limit: PAGE });
 }
+
+// Clear the search without leaving the page you're on. The reader keeps its place and
+// loses its underlines; the results give way to the home view.
+function clearSearch() {
+  input.value = "";
+  if (mode !== "read") focusVerse = -1;
+  runSearch(false);
+  for (const el of $("reader").querySelectorAll(".m")) el.className = el.className.replace(/ m( m-\w+)?/, "");
+  syncUrl(true);
+}
+$("clear").onclick = () => {
+  clearSearch();
+  if (mode !== "read") input.focus(); // while reading, focus would bring the keyboard up over the page
+};
 
 input.addEventListener("input", () => {
   if (!meta) return;
@@ -455,11 +472,17 @@ function fmtTime(ms) {
 }
 const plural = (n, word) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`;
 
-function showResults(m) {
-  if (m.id !== searchId) return;
-  const s = m.summary;
-  shown = { id: m.id, total: s.total, loaded: m.page.length, q: m.q };
-  status.innerHTML = "";
+// The controls that say where you are. The line under the search box holds examples to try
+// while the box is empty, the way back to the results while reading, and otherwise what
+// the search found.
+function showPlace() {
+  const searched = shown.q.trim() !== "";
+  $("read-btn").setAttribute("aria-pressed", String(mode === "read"));
+  $("sort-btn").disabled = !searched || mode === "read";
+  status.hidden = !searched && mode === "read"; // nothing to say above a chapter when there's no search
+  status.scrollLeft = 0;
+  if (!searched) return status.replaceChildren(tryLine);
+  status.replaceChildren();
   const add = (html, cls) => {
     const span = document.createElement("span");
     if (cls) span.className = cls;
@@ -467,6 +490,12 @@ function showResults(m) {
     status.append(span);
     return span;
   };
+  if (mode === "read") {
+    const back = add(`<button type="button">← ${plural(shown.total, "result")} for “${esc(shown.q.trim())}”</button>`);
+    back.querySelector("button").onclick = leaveReader;
+    return;
+  }
+  const s = shown.summary;
   if (s.reference) add(s.total ? plural(s.total, "verse") : "No such passage");
   else if (!s.total) add("Nothing matched. Try fewer words, or say it the way you remember it.");
   else if (s.terms > 1) add(`${s.full.toLocaleString()} with every word · ${plural(s.total, "verse")} with some · ${plural(s.books, "book")}`);
@@ -477,8 +506,13 @@ function showResults(m) {
     const b = add(`<button type="button">Open ${esc(s.book.name)} 1</button>`);
     b.querySelector("button").onclick = () => openReader(s.book.first);
   }
-  add(`search ${fmtTime(m.ms)}`);
-  status.scrollLeft = 0;
+  add(`search ${fmtTime(shown.ms)}`);
+}
+
+function showResults(m) {
+  if (m.id !== searchId) return;
+  shown = { id: m.id, total: m.summary.total, loaded: m.page.length, q: m.q, summary: m.summary, ms: m.ms };
+  showPlace();
   list.innerHTML = m.page.map(hitHtml).join("");
   resetListScroll();
   selected = -1;
@@ -786,7 +820,7 @@ document.addEventListener("keydown", (e) => {
     else if (k === "Escape") {
       e.preventDefault();
       if (!$("lex").hidden) $("lex").hidden = true;
-      else if (input.value) { input.value = ""; focusVerse = -1; runSearch(false); setMode(mode); syncUrl(true); }
+      else if (input.value) clearSearch();
       else input.blur();
     }
     return;
@@ -801,7 +835,7 @@ document.addEventListener("keydown", (e) => {
       j: () => reader.step(1), ArrowDown: () => reader.step(1),
       k: () => reader.step(-1), ArrowUp: () => reader.step(-1),
       c: () => openContents(),
-      Escape: () => (!$("lex").hidden ? ($("lex").hidden = true) : input.value.trim() ? $("read-btn").click() : openContents()),
+      Escape: () => (!$("lex").hidden ? ($("lex").hidden = true) : leaveReader()),
     };
     if (readKeys[k]) {
       e.preventDefault();
