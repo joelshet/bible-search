@@ -17,35 +17,37 @@
 <body>
 <bible-search>
   <h1 id="title"><a href="./">Bible Search</a></h1>
+  <button type="button" id="menu-btn" popovertarget="menu" aria-label="Menu">···</button>
   <header>
     <form role="search" id="search-form">
       <label for="q" class="sr">Search the King James Bible</label>
       <input id="q" type="search" autocomplete="off" autocapitalize="off" spellcheck="false"
              enterkeyhint="search" placeholder="Search the way you remember it">
+      <button type="button" id="clear" aria-label="Clear the search">×</button>
       <span id="loading" aria-live="polite">Loading the Bible…</span>
     </form>
-    <nav aria-label="Tools">
-      <button type="button" id="read-btn" title="Read the Bible (r)">read</button>
-      <button type="button" id="sort-btn" title="Sort order (s)">relevance</button>
-      <button type="button" id="map-btn" title="Show or hide the map (m)" aria-pressed="true">map</button>
-      <button type="button" id="qr-btn" title="QR code for this passage (q)">qr</button>
-      <button type="button" id="present-btn" title="Present this verse (p)">present</button>
-      <button type="button" id="settings-btn" title="Reading settings (,)" aria-label="Reading settings">Aa</button>
-      <button type="button" id="help-btn" title="Keyboard keys (?)" aria-label="Keyboard keys">?</button>
+    <!-- Inline on a wide screen. On a phone it's the menu the three dots open, and choosing an item closes it. -->
+    <nav id="menu" popover aria-label="Tools">
+      <button type="button" id="read-btn" title="Read, or leave reading (r)" aria-pressed="false" popovertarget="menu" popovertargetaction="hide">read</button>
+      <button type="button" id="sort-btn" title="Sort order (s)" popovertarget="menu" popovertargetaction="hide">relevance</button>
+      <button type="button" id="map-btn" title="Show or hide the map (m)" aria-pressed="true" popovertarget="menu" popovertargetaction="hide">map</button>
+      <button type="button" id="qr-btn" title="QR code for this passage (q)" popovertarget="menu" popovertargetaction="hide">qr<span class="word"> code</span></button>
+      <button type="button" id="present-btn" title="Present this verse (p)" popovertarget="menu" popovertargetaction="hide">present</button>
+      <button type="button" id="settings-btn" title="Reading settings (,)" aria-label="Reading settings" popovertarget="menu" popovertargetaction="hide">Aa<span class="word"> settings</span></button>
+      <button type="button" id="help-btn" title="Search tips and keys (?)" aria-label="Search tips and keys" popovertarget="menu" popovertargetaction="hide">?<span class="word"> help</span></button>
     </nav>
-    <div id="status" aria-live="polite"></div>
+    <div id="status" aria-live="polite"><span class="try">Try
+      <button type="button" data-q="eagles not getting tired">eagles not getting tired</button>,
+      <button type="button" data-q="plans to prosper you">plans to prosper you</button>,
+      <button type="button" data-q="do not worry about tomorrow">do not worry about tomorrow</button>,
+      <button type="button" data-q="agape">agape</button>,
+      <button type="button" data-q="ps 23">ps 23</button>, or
+      <button type="button" data-q="fear in:gospels">fear in:gospels</button></span></div>
   </header>
 
   <main>
     <section id="results" aria-label="Results">
       <div id="intro">
-        <p class="try">Modern wording is fine. Try
-          <button type="button" data-q="eagles not getting tired">eagles not getting tired</button>,
-          <button type="button" data-q="plans to prosper you">plans to prosper you</button>,
-          <button type="button" data-q="do not worry about tomorrow">do not worry about tomorrow</button>,
-          <button type="button" data-q="agape">agape</button>,
-          <button type="button" data-q="ps 23">ps 23</button>, or
-          <button type="button" data-q="fear in:gospels">fear in:gospels</button>.</p>
         <nav id="books" class="contents" aria-label="Books of the Bible"></nav>
         <p class="credits">King James Version, 1769 text, with Strong's tagging from CrossWire and eBible.org. Strong's dictionaries from <a href="https://github.com/openscriptures/strongs">Open Scriptures</a> (CC BY-SA). Synonyms from <a href="https://wordnet.princeton.edu/">WordNet 3.0</a>, Princeton University. EB Garamond and Atkinson Hyperlegible fonts (OFL). Runs entirely in your browser and works offline after the first visit.</p>
       </div>

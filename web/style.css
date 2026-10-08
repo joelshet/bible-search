@@ -86,7 +86,7 @@ bible-search > header {
 #search-form { position: relative; }
 #q {
   width: 100%;
-  padding: 4px 0 8px;
+  padding: 4px 34px 8px 0;
   font: 400 30px/1.2 var(--read);
   border: 0;
   border-bottom: 1px solid var(--rule);
@@ -99,10 +99,22 @@ bible-search > header {
 #q:focus { border-bottom-color: var(--ink); }
 #q::placeholder { color: var(--quiet); font-style: italic; }
 #q::-webkit-search-cancel-button { display: none; }
-#loading { position: absolute; right: 0; bottom: 12px; color: var(--quiet); font-size: 15px; font-style: italic; pointer-events: none; }
+#clear {
+  display: none; position: absolute; right: 0; bottom: 6px; border: 0; background: none;
+  padding: 4px 6px; font-size: 26px; line-height: 1; color: var(--quiet); cursor: pointer;
+}
+#clear:hover { color: var(--ink); }
+bible-search[data-has-query] #clear { display: block; }
+#loading { position: absolute; right: 34px; bottom: 12px; color: var(--quiet); font-size: 15px; font-style: italic; pointer-events: none; }
 #loading:empty { display: none; }
 
-header nav { display: flex; gap: 2px 16px; padding-bottom: 10px; flex-wrap: wrap; }
+/* The nav carries the popover attribute for its phone form; here it's an ordinary row. */
+header nav {
+  display: flex; gap: 2px 16px; flex-wrap: wrap;
+  position: static; inset: auto; margin: 0; border: 0; padding: 0 0 10px;
+  width: auto; height: auto; overflow: visible; color: inherit; background: none;
+}
+header nav .word, #menu-btn { display: none; }
 header nav button, .map-tools button, .try button, #status button, dialog form > button, #lex .actions button, .context nav button, .act {
   border: 0;
   background: none;
@@ -112,7 +124,9 @@ header nav button, .map-tools button, .try button, #status button, dialog form >
   font-size: 17px;
 }
 header nav button:hover, header nav button:focus-visible, .map-tools button:hover { color: var(--ink); }
-header nav button[aria-pressed="false"] { text-decoration: line-through; text-decoration-thickness: 1px; }
+#map-btn[aria-pressed="false"] { text-decoration: line-through; text-decoration-thickness: 1px; }
+#read-btn[aria-pressed="true"] { color: var(--ink); }
+header nav button:disabled { opacity: 0.35; cursor: default; color: var(--quiet); }
 /* One line. Anything that doesn't fit scrolls sideways, and the right edge fades to say so. */
 #status {
   grid-column: 1 / -1; min-height: 1.5em; color: var(--quiet); font-size: 15px;
@@ -120,6 +134,7 @@ header nav button[aria-pressed="false"] { text-decoration: line-through; text-de
   padding-right: 28px; mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
 }
 #status::-webkit-scrollbar { display: none; }
+#status[hidden] { display: none; }
 #status > * { flex: none; }
 #status .note { color: var(--rubric); }
 #status button { color: var(--rubric); font-size: 15px; }
@@ -157,7 +172,7 @@ main {
 
 #intro { max-width: 34rem; padding-top: 4px; }
 #intro p { margin: 0 0 14px; }
-.try button { color: var(--rubric); font-style: italic; padding: 0; font-size: inherit; }
+.try button { color: var(--rubric); font-style: italic; padding: 0; font-variant-caps: normal; letter-spacing: 0; }
 .try button:hover { text-decoration: underline; text-decoration-thickness: 1px; }
 .credits { color: var(--quiet); }
 #intro .credits { font-size: 14px; margin-top: 40px; }
@@ -297,10 +312,29 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--rubric); }
 /* ---------- small screens ---------- */
 
 @media (max-width: 860px) {
-  #title { padding: 10px 18px 0; }
+  #title { padding: calc(10px + env(safe-area-inset-top)) 18px 0; }
+
+  header nav { padding-bottom: 0; gap: 2px 14px; }
+
+  /* The tools fold into a menu behind three dots, so nothing but the search box sits above the page. */
+  @supports selector(:popover-open) {
+    #menu-btn {
+      display: block; position: fixed; top: env(safe-area-inset-top); right: 4px; z-index: 2;
+      border: 0; background: none; padding: 2px 14px 8px; font-size: 24px; letter-spacing: 2px;
+      color: var(--quiet); cursor: pointer;
+    }
+    header nav {
+      position: fixed; inset: calc(38px + env(safe-area-inset-top)) 10px auto auto;
+      flex-direction: column; flex-wrap: nowrap; align-items: flex-start; gap: 4px;
+      padding: 10px 22px 12px 18px; background: var(--paper);
+      box-shadow: 0 0 0 1px var(--rule), 0 20px 50px rgba(0, 0, 0, 0.12);
+    }
+    header nav:not(:popover-open) { display: none; }
+    header nav button { font-size: 19px; padding: 5px 0; }
+    header nav .word { display: inline; }
+  }
   bible-search > header { grid-template-columns: 1fr; padding: 2px 18px 8px; gap: 6px; }
   #q { font-size: 24px; }
-  header nav { padding-bottom: 0; gap: 2px 14px; }
   main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   #map-panel { order: -1; width: 100%; aspect-ratio: 2 / 1; max-height: 40dvh; margin: 0 0 4px; }
   bible-search[data-map="hidden"] #map-panel { display: none; }
