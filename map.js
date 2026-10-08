@@ -46,20 +46,27 @@ export class BibleMap {
   }
 
   setColors(colors) {
+    if (JSON.stringify(colors) === JSON.stringify(this.colors)) return;
     this.colors = colors;
-    this.renderGlow();
+    this.glowStale = true;
     this.draw();
   }
 
   setFont(family) {
+    if (family === this.family) return;
     this.family = family;
+    this.remeasure();
+  }
+
+  // Verses wrapped before a web font finished loading were measured in its fallback.
+  remeasure() {
     this.wrapCache.clear();
     this.draw();
   }
 
   setHits(hits) {
     this.hits = hits;
-    this.renderGlow();
+    this.glowStale = true;
     this.draw();
   }
 
@@ -75,7 +82,7 @@ export class BibleMap {
     this.typicalF = 0;
     this.wrapCache.clear();
     this.cam = { x: aspect / 2, y: 0.5, k: this.fitK() };
-    this.renderGlow();
+    this.glowStale = true;
     this.draw();
   }
 
@@ -220,15 +227,18 @@ export class BibleMap {
 
   // A soft halo under the matches, drawn once per search at overview scale and blurred.
   // Zoomed out, the Bible reads like a night photo where the matching verses are lit.
+  // The tiles are drawn sharp, then blurred in one pass: a filter set while drawing them
+  // would blur every tile separately, which takes seconds on a broad search.
   renderGlow() {
+    this.glowStale = false;
     this.glow = null;
-    if (!this.hits || !this.colors) return;
+    if (!this.hits) return;
     const size = Math.round(900 / Math.max(1, this.aspect));
-    const g = document.createElement("canvas");
-    g.width = Math.round(size * this.aspect);
-    g.height = size;
-    const ctx = g.getContext("2d");
-    ctx.filter = "blur(5px)";
+    const sharp = (this.glowSharp ||= document.createElement("canvas"));
+    const soft = (this.glowSoft ||= document.createElement("canvas"));
+    sharp.width = soft.width = Math.round(size * this.aspect);
+    sharp.height = soft.height = size;
+    let ctx = sharp.getContext("2d");
     ctx.fillStyle = this.colors.glow;
     for (let v = 0; v < this.verses; v++) {
       const hit = this.hits[v];
@@ -237,7 +247,10 @@ export class BibleMap {
       ctx.globalAlpha = 0.25 + 0.75 * (hit / 255);
       ctx.fillRect(x * size - 1, y * size - 1, Math.max(w * size, 1) + 2, Math.max(h * size, 1) + 2);
     }
-    this.glow = g;
+    ctx = soft.getContext("2d");
+    ctx.filter = "blur(5px)";
+    ctx.drawImage(sharp, 0, 0);
+    this.glow = soft;
   }
 
   paint() {
@@ -306,6 +319,7 @@ export class BibleMap {
 
     // The halo fades out as you zoom in, where it would only blur the tiles.
     const fade = 1 - Math.min(1, Math.max(0, (k / this.fitK() - 1.5) / 4));
+    if (fade > 0 && this.glowStale) this.renderGlow();
     if (this.glow && fade > 0) {
       ctx.globalCompositeOperation = colors.dark ? "lighter" : "multiply";
       ctx.globalAlpha = (colors.dark ? 0.55 : 0.35) * fade;

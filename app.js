@@ -123,7 +123,7 @@ function ready(m) {
   applySettings();
   restoreFromUrl();
   // Canvas text can't use a web font until it has loaded; redraw once it has.
-  document.fonts.load('20px "EB Garamond"').then(() => applySettings());
+  document.fonts.load('20px "EB Garamond"').then(() => map?.remeasure());
 }
 
 // The map is laid out for the shape of its panel: a wide band on a phone, the side panel on a laptop.
@@ -242,9 +242,10 @@ window.addEventListener("popstate", () => meta && restoreFromUrl());
 // ---------- reading ----------
 
 function setMode(m) {
+  const changed = m !== mode;
   mode = m;
   shell.dataset.mode = m;
-  applySettings();
+  if (changed) applySettings(); // only the map's visibility depends on the mode
   $("read-btn").textContent = m === "read" && input.value.trim() ? "results" : "read";
 }
 

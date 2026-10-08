@@ -1,5 +1,5 @@
 // Offline after the first visit: everything the app needs is cached up front.
-const VERSION = "867cdf89eb8d";
+const VERSION = "0113ee743ef5";
 const FILES = [
   "./", "index.html", "style.css", "app.js", "map.js", "reader.js", "worker.js",
   "pkg/bible.js", "pkg/bible_bg.wasm", "data/bible.idx.gz", "data/lexicon.idx.gz",
@@ -12,7 +12,9 @@ const DEV = VERSION === "dev";
 
 self.addEventListener("install", (e) => {
   if (DEV) return self.skipWaiting();
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+  // Fetch past the HTTP cache: a stale copy saved under a new VERSION would be served from then on.
+  const fresh = FILES.map((f) => new Request(f, { cache: "reload" }));
+  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(fresh)).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (e) => {
