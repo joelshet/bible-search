@@ -1,0 +1,140 @@
+// Continuous reading: a contents page, then chapter after chapter as you scroll.
+
+export class Reader {
+  constructor(box, scroller, { ask, meta, verseHtml, onVerse }) {
+    this.box = box;
+    this.scroller = scroller;
+    this.ask = ask;
+    this.meta = meta;
+    this.verseHtml = verseHtml;
+    this.onVerse = onVerse;
+    this.first = -1; // first and last chapter currently rendered
+    this.last = -1;
+    this.loading = false;
+    this.token = 0;
+    this.sentinel = document.createElement("div");
+    this.sentinel.className = "reader-end";
+    new IntersectionObserver((e) => e[0].isIntersecting && this.appendNext(), {
+      root: scroller,
+      rootMargin: "900px",
+    }).observe(this.sentinel);
+    let pending = false;
+    scroller.addEventListener("scroll", () => {
+      if (pending || this.first < 0) return;
+      pending = true;
+      setTimeout(() => {
+        pending = false;
+        this.track();
+      }, 120);
+    }, { passive: true });
+  }
+
+  chapterCount() {
+    return this.meta.chapterStart.length;
+  }
+
+  chapterOf(v) {
+    const s = this.meta.chapterStart;
+    let lo = 0, hi = s.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (s[mid] <= v) lo = mid; else hi = mid - 1;
+    }
+    return lo;
+  }
+
+  async chapterHtml(c) {
+    const m = this.meta;
+    const ch = await this.ask("chapter", { verse: m.chapterStart[c] });
+    const book = m.books[m.chapterBook[c]][1];
+    const single = !m.chapterBook.some((b, i) => b === m.chapterBook[c] && i !== c);
+    const verses = ch.verses.map((x) => {
+      const para = x.seg[0]?.[0]?.startsWith("¶") ? " para" : "";
+      return `<p class="vl${para}" data-v="${x.id}"><sup>${x.v}</sup>${this.verseHtml(x.seg)}</p>`;
+    }).join("");
+    return `<section class="chapter" data-c="${c}">
+      <header><span class="book">${book}</span>${single ? "" : `<span class="num">${m.chapterNum[c]}</span>`}</header>
+      ${ch.title ? `<p class="title">${ch.title}</p>` : ""}
+      <div class="verses">${verses}</div></section>`;
+  }
+
+  // Open the reader at verse v: its chapter, scrolled so v sits near the top.
+  async open(v) {
+    const token = ++this.token;
+    const c = this.chapterOf(v);
+    const html = await this.chapterHtml(c);
+    if (token !== this.token) return;
+    this.first = this.last = c;
+    const prev = c > 0
+      ? `<button type="button" class="prev-chapter" data-go="${this.meta.chapterStart[c - 1]}">${this.label(c - 1)}</button>`
+      : "";
+    this.box.innerHTML = `<nav class="reader-nav"><button type="button" data-act="contents">contents</button>${prev}</nav>${html}`;
+    this.box.append(this.sentinel);
+    this.mark(v);
+    const el = this.box.querySelector(`[data-v="${v}"]`);
+    if (el && v !== this.meta.chapterStart[c]) el.scrollIntoView({ block: "start" });
+    else this.scroller.scrollTop = 0;
+    this.appendNext();
+  }
+
+  label(c) {
+    const m = this.meta;
+    return `${m.books[m.chapterBook[c]][1]} ${m.chapterNum[c]}`;
+  }
+
+  async appendNext() {
+    if (this.loading || this.last < 0 || this.last + 1 >= this.chapterCount()) return;
+    this.loading = true;
+    const token = this.token;
+    const html = await this.chapterHtml(this.last + 1);
+    this.loading = false;
+    if (token !== this.token) return;
+    this.last++;
+    this.sentinel.insertAdjacentHTML("beforebegin", html);
+  }
+
+  mark(v) {
+    this.box.querySelector(".vl.here")?.classList.remove("here");
+    this.box.querySelector(`[data-v="${v}"]`)?.classList.add("here");
+  }
+
+  // The verse at the top of the screen is where you are.
+  track() {
+    const r = this.scroller.getBoundingClientRect();
+    const el = document.elementFromPoint(r.left + r.width / 2, r.top + 24)?.closest(".vl");
+    if (el) this.onVerse(Number(el.dataset.v), false);
+  }
+
+  step(dir) {
+    const all = [...this.box.querySelectorAll(".vl")];
+    const i = all.findIndex((el) => el.classList.contains("here"));
+    const next = all[Math.max(0, Math.min(all.length - 1, (i < 0 ? 0 : i + dir)))];
+    if (!next) return;
+    this.mark(Number(next.dataset.v));
+    next.scrollIntoView({ block: "nearest" });
+    this.onVerse(Number(next.dataset.v), true);
+  }
+
+  chapterStep(dir, from) {
+    const c = Math.max(0, Math.min(this.chapterCount() - 1, this.chapterOf(from) + dir));
+    return this.meta.chapterStart[c];
+  }
+
+  contents() {
+    ++this.token;
+    this.first = this.last = -1;
+    const m = this.meta;
+    const group = (title, from, to) => {
+      const items = [];
+      for (let b = from; b < to; b++) {
+        const chapters = [];
+        m.chapterBook.forEach((bk, c) => bk === b && chapters.push(c));
+        items.push(`<li><button type="button" class="book" data-book="${b}" data-first="${m.chapterStart[chapters[0]]}" data-count="${chapters.length}">${m.books[b][1]}</button>
+          <span class="chapters" hidden>${chapters.length > 1 ? chapters.map((c, i) => `<button type="button" data-go="${m.chapterStart[c]}">${i + 1}</button>`).join("") : ""}</span></li>`);
+      }
+      return `<h2>${title}</h2><ol class="books">${items.join("")}</ol>`;
+    };
+    this.box.innerHTML = `<div class="contents">${group("The Old Testament", 0, 39)}${group("The New Testament", 39, 66)}</div>`;
+    this.scroller.scrollTop = 0;
+  }
+}

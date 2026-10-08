@@ -1,0 +1,2 @@
+- add speaking that somehow scrubs really fast and has great speed control (somehow audio plus transcript/timestamp index so that the audio can play almost instantly)
+- add offline local storage (indexeddb?) memorization cards concept
