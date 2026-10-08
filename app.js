@@ -137,6 +137,7 @@ function ready(m) {
     verseHtml: versePlain,
     onVerse: (v, explicit) => {
       focusVerse = v;
+      syncRail();
       map?.setSelected(v);
       try {
         localStorage.setItem("bible-last", String(v));
@@ -145,6 +146,7 @@ function ready(m) {
       if (explicit && settings.motion) map?.locate(v);
     },
   });
+  $("books").innerHTML = reader.booksHtml();
   applySettings();
   restoreFromUrl();
   // Canvas text can't use a web font until it has loaded; redraw once it has.
@@ -299,6 +301,7 @@ function setMode(m) {
   shell.dataset.mode = m;
   if (changed) applySettings(); // only the map's visibility depends on the mode
   if (changed && m === "search") $("results").scrollTop = listScroll;
+  syncRail();
   $("read-btn").textContent = m === "read" && input.value.trim() ? "results" : "read";
 }
 
@@ -306,15 +309,36 @@ function openReader(v, push = true) {
   if (!reader || v < 0) return;
   setMode("read");
   focusVerse = v;
+  syncRail();
   map?.setSelected(v);
   reader.open(v);
   syncUrl(push);
+}
+
+// Beside the text, where the screen has room: every chapter of the book being read.
+let railBook = -1;
+function syncRail() {
+  const rail = $("rail");
+  const c = meta && mode === "read" && focusVerse >= 0 ? chapterOf(focusVerse) : -1;
+  const b = c < 0 ? -1 : meta.chapterBook[c];
+  if (b !== railBook) {
+    railBook = b;
+    const chapters = b < 0 ? [] : meta.chapterBook.flatMap((book, i) => (book === b ? [i] : []));
+    rail.innerHTML = chapters.length > 1 ? chapters.map((i) => reader.chapterLink(i, meta.chapterNum[i])).join("") : "";
+  }
+  rail.hidden = !rail.firstChild;
+  const now = rail.children[c < 0 ? -1 : meta.chapterNum[c] - 1];
+  if (!now || now.hasAttribute("aria-current")) return;
+  rail.querySelector("[aria-current]")?.removeAttribute("aria-current");
+  now.setAttribute("aria-current", "true");
+  now.scrollIntoView({ block: "nearest" });
 }
 
 function openContents(push = true) {
   if (!reader) return;
   setMode("read");
   focusVerse = -1;
+  syncRail();
   map?.setSelected(-1);
   reader.contents();
   syncUrl(push);
@@ -340,18 +364,33 @@ $("read-btn").onclick = () => {
   v >= 0 ? openReader(v) : openContents();
 };
 
+// A click on a chapter link or button opens it here. With a modifier key the link's
+// own address opens in a new tab or window instead.
+function followGo(e) {
+  const go = e.target.closest("[data-go]");
+  if (!go || !reader || e.metaKey || e.ctrlKey || e.shiftKey) return false;
+  e.preventDefault();
+  openReader(Number(go.dataset.go));
+  return true;
+}
+$("books").addEventListener("click", followGo);
+$("rail").addEventListener("click", followGo);
+
+// The title is the way home: no search, the map, and the list of books.
+$("title").addEventListener("click", (e) => {
+  if (!meta || e.metaKey || e.ctrlKey || e.shiftKey) return;
+  e.preventDefault();
+  input.value = "";
+  focusVerse = -1;
+  setMode("search");
+  runSearch(false);
+  syncUrl(true);
+});
+
 $("reader").addEventListener("click", (e) => {
   const t = e.target;
-  const go = t.closest("[data-go]");
-  if (go) return openReader(Number(go.dataset.go));
+  if (followGo(e)) return;
   if (t.closest('[data-act="contents"]')) return openContents();
-  const book = t.closest("button.book");
-  if (book) {
-    if (book.dataset.count === "1") return openReader(Number(book.dataset.first));
-    const chapters = book.nextElementSibling;
-    chapters.hidden = !chapters.hidden;
-    return;
-  }
   const word = t.closest(".w[data-s]");
   if (word) return openLexicon(word.dataset.s);
   const line = t.closest(".vl");
@@ -721,7 +760,6 @@ $("zoom-in").onclick = () => map?.zoomBy(1.8);
 $("zoom-out").onclick = () => map?.zoomBy(1 / 1.8);
 $("zoom-reset").onclick = () => map?.reset();
 $("zoom-locate").onclick = () => map?.locate(currentVerse());
-document.querySelector('#intro [data-act="contents"]').onclick = () => openContents();
 document.querySelectorAll("[data-q]").forEach((b) =>
   b.addEventListener("click", () => {
     input.value = b.dataset.q;

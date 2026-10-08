@@ -1,5 +1,7 @@
 // Continuous reading: a contents page, then chapter after chapter as you scroll.
 
+const AHEAD = 2000; // how far past the bottom of the screen chapters are loaded, in pixels
+
 export class Reader {
   constructor(box, scroller, { ask, meta, verseHtml, onVerse }) {
     this.box = box;
@@ -16,7 +18,7 @@ export class Reader {
     this.sentinel.className = "reader-end";
     new IntersectionObserver((e) => e[0].isIntersecting && this.appendNext(), {
       root: scroller,
-      rootMargin: "900px",
+      rootMargin: `${AHEAD}px`,
     }).observe(this.sentinel);
     let pending = false;
     scroller.addEventListener("scroll", () => {
@@ -91,6 +93,9 @@ export class Reader {
     if (token !== this.token) return;
     this.last++;
     this.sentinel.insertAdjacentHTML("beforebegin", html);
+    // Short chapters can leave the end still close; keep going so a fast scroll never runs out of page.
+    const shown = this.sentinel.offsetParent !== null;
+    if (shown && this.sentinel.getBoundingClientRect().top < this.scroller.getBoundingClientRect().bottom + AHEAD) this.appendNext();
   }
 
   mark(v) {
@@ -120,21 +125,26 @@ export class Reader {
     return this.meta.chapterStart[c];
   }
 
+  // A real link to chapter c, so a new tab works; data-go lets a plain click stay in the app.
+  chapterLink(c, label) {
+    const m = this.meta;
+    return `<a href="?read=${m.books[m.chapterBook[c]][0]}.${m.chapterNum[c]}" data-go="${m.chapterStart[c]}">${label}</a>`;
+  }
+
+  // Every book, each a link to its first chapter.
+  booksHtml() {
+    const m = this.meta;
+    const first = [];
+    m.chapterBook.forEach((b, c) => (first[b] ??= c));
+    const group = (title, from, to) =>
+      `<h2>${title}</h2><ol class="books">${first.slice(from, to).map((c, i) => `<li>${this.chapterLink(c, m.books[from + i][1])}</li>`).join("")}</ol>`;
+    return group("The Old Testament", 0, 39) + group("The New Testament", 39, 66);
+  }
+
   contents() {
     ++this.token;
     this.first = this.last = -1;
-    const m = this.meta;
-    const group = (title, from, to) => {
-      const items = [];
-      for (let b = from; b < to; b++) {
-        const chapters = [];
-        m.chapterBook.forEach((bk, c) => bk === b && chapters.push(c));
-        items.push(`<li><button type="button" class="book" data-book="${b}" data-first="${m.chapterStart[chapters[0]]}" data-count="${chapters.length}">${m.books[b][1]}</button>
-          <span class="chapters" hidden>${chapters.length > 1 ? chapters.map((c, i) => `<button type="button" data-go="${m.chapterStart[c]}">${i + 1}</button>`).join("") : ""}</span></li>`);
-      }
-      return `<h2>${title}</h2><ol class="books">${items.join("")}</ol>`;
-    };
-    this.box.innerHTML = `<div class="contents">${group("The Old Testament", 0, 39)}${group("The New Testament", 39, 66)}</div>`;
+    this.box.innerHTML = `<div class="contents">${this.booksHtml()}</div>`;
     this.scroller.scrollTop = 0;
   }
 }

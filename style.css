@@ -67,9 +67,12 @@ a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 0.15e
 
 bible-search {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto 1fr;
   height: var(--app-height, 100dvh);
 }
+#title { margin: 0; padding: 14px 32px 0; font: 400 15px var(--garamond); font-variant-caps: all-small-caps; letter-spacing: 0.14em; }
+#title a { color: var(--quiet); text-decoration: none; }
+#title a:hover { color: var(--ink); }
 
 /* ---------- header ---------- */
 
@@ -78,7 +81,7 @@ bible-search > header {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   gap: 4px 28px;
-  padding: 22px 32px 14px;
+  padding: 4px 32px 14px;
 }
 #search-form { position: relative; }
 #q {
@@ -131,6 +134,15 @@ main {
 }
 #results { overflow-y: auto; padding: 18px 32px 45vh; overscroll-behavior: contain; scrollbar-width: thin; }
 #map-panel { position: relative; min-height: 0; margin: 0 20px 20px 0; }
+
+/* The chapters of the book being read. Only shown where there's room beside the text. */
+#rail { display: none; }
+#rail a {
+  color: var(--quiet); text-decoration: none; text-align: right; padding: 1px 6px;
+  font-size: 16px; font-variant-numeric: oldstyle-nums;
+}
+#rail a:hover { color: var(--ink); }
+#rail a[aria-current] { color: var(--rubric); }
 #map { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; outline: none; }
 #map:active { cursor: grabbing; }
 #tip {
@@ -143,12 +155,11 @@ main {
 
 /* ---------- intro ---------- */
 
-#intro { max-width: 34rem; padding-top: 10px; }
-#intro .lede { font-size: 26px; line-height: 1.25; margin: 0 0 14px; }
+#intro { max-width: 34rem; padding-top: 4px; }
 #intro p { margin: 0 0 14px; }
 .try button { color: var(--rubric); font-style: italic; padding: 0; font-size: inherit; }
 .try button:hover { text-decoration: underline; text-decoration-thickness: 1px; }
-.quiet, .credits { color: var(--quiet); }
+.credits { color: var(--quiet); }
 #intro .credits { font-size: 14px; margin-top: 40px; }
 code, kbd { font: 0.82em ui-monospace, "SF Mono", Menlo, monospace; color: var(--ink); }
 bible-search[data-has-query] #intro { display: none; }
@@ -194,7 +205,6 @@ button.why:hover { color: var(--ink); }
 .context nav button { font-style: italic; font-size: 16px; }
 #more { height: 1px; }
 .pilcrow { color: var(--rubric); }
-button.link { border: 0; background: none; padding: 0; cursor: pointer; color: var(--rubric); font-style: italic; }
 
 /* ---------- reading ---------- */
 
@@ -204,11 +214,11 @@ bible-search[data-mode="read"] #intro,
 bible-search[data-mode="read"] #list,
 bible-search[data-mode="read"] #more { display: none; }
 .reader-nav { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
-.reader-nav button, .contents button {
+.reader-nav button {
   border: 0; background: none; padding: 0; cursor: pointer; color: var(--quiet); font-size: 17px;
   font-variant-caps: all-small-caps; letter-spacing: 0.06em;
 }
-.reader-nav button:hover, .contents button:hover { color: var(--ink); }
+.reader-nav button:hover { color: var(--ink); }
 .chapter { margin: 0 0 64px; }
 .chapter > header { display: flex; flex-direction: column; align-items: center; margin: 28px 0 22px; }
 .chapter > header .book { font-variant-caps: all-small-caps; letter-spacing: 0.14em; color: var(--quiet); font-size: 18px; }
@@ -228,10 +238,7 @@ bible-search[data-mode="read"] #more { display: none; }
 .contents h2 { font-weight: 400; font-variant-caps: all-small-caps; letter-spacing: 0.12em; color: var(--rubric); font-size: 20px; margin: 18px 0 8px; }
 .contents .books { list-style: none; padding: 0; margin: 0 0 24px; columns: 2; column-gap: 28px; }
 .contents .books li { break-inside: avoid; padding: 1px 0; }
-.contents .book { font-variant-caps: normal; letter-spacing: 0; color: var(--ink); font-size: 19px; }
-.contents .chapters { display: flex; flex-wrap: wrap; gap: 2px 10px; padding: 2px 0 8px; }
-.contents .chapters[hidden] { display: none; }
-.contents .chapters button { font-variant-caps: normal; font-variant-numeric: oldstyle-nums; color: var(--rubric); min-width: 1.4em; }
+.contents .books a { display: block; color: var(--ink); font-size: 19px; text-decoration: none; }
 
 /* ---------- word study ---------- */
 
@@ -290,7 +297,8 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--rubric); }
 /* ---------- small screens ---------- */
 
 @media (max-width: 860px) {
-  bible-search > header { grid-template-columns: 1fr; padding: 14px 18px 8px; gap: 6px; }
+  #title { padding: 10px 18px 0; }
+  bible-search > header { grid-template-columns: 1fr; padding: 2px 18px 8px; gap: 6px; }
   #q { font-size: 24px; }
   header nav { padding-bottom: 0; gap: 2px 14px; }
   main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
@@ -301,7 +309,8 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--rubric); }
   #lex { left: 0; right: 0; top: auto; bottom: 0; width: auto; max-height: 64dvh; }
 
   /* Search box by the thumb: the header moves under the results, with the box itself lowest. */
-  :root[data-bottom="on"] bible-search { grid-template-rows: 1fr auto; }
+  :root[data-bottom="on"] bible-search { grid-template-rows: auto 1fr auto; }
+  :root[data-bottom="on"] #title { padding-bottom: 6px; }
   :root[data-bottom="on"] bible-search > header {
     order: 1; padding: 6px 18px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid var(--rule);
   }
@@ -311,6 +320,14 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--rubric); }
   :root[data-bottom="on"] bible-search[data-keyboard] #map-panel { display: none; }
 }
 @media (min-width: 861px) {
-  bible-search[data-map="hidden"] main { grid-template-columns: minmax(340px, 42rem); justify-content: center; }
+  main { grid-template-columns: minmax(340px, 40rem) auto 1fr; }
+  #results { grid-column: 1; }
+  #rail { grid-column: 2; }
+  #map-panel { grid-column: 3; }
+  #rail:not([hidden]) {
+    display: flex; flex-direction: column; min-height: 0; overflow-y: auto; scrollbar-width: none;
+    padding: 20px 14px 45vh 0;
+  }
+  bible-search[data-map="hidden"] main { grid-template-columns: minmax(340px, 42rem) auto; justify-content: center; }
   bible-search[data-map="hidden"] #map-panel { display: none; }
 }
