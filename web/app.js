@@ -118,10 +118,21 @@ worker.onmessage = ({ data: m }) => {
     const r = requests.get(m.req);
     requests.delete(m.req);
     if (r) m.error ? r.reject(new Error(m.error)) : r.resolve(m.result);
+  } else if (m.type === "lexicon") {
+    keepOffline();
   } else if (m.type === "error") {
     $("loading").textContent = `Couldn't load: ${m.message}`;
   }
 };
+
+// Runs once the last download is in, so the service worker saves the copies the browser
+// already has. Started any sooner, it would download the Bible a second time alongside the page.
+function keepOffline() {
+  if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+  // An installed app asks the browser not to clear its files when the device runs low on space.
+  if (matchMedia("(display-mode: standalone)").matches) navigator.storage?.persist?.();
+}
 
 function ready(m) {
   meta = m.meta;
@@ -1016,7 +1027,4 @@ document.addEventListener("keydown", (e) => {
 // ---------- start ----------
 
 applySettings();
-if ("serviceWorker" in navigator && location.protocol !== "file:") {
-  navigator.serviceWorker.register("sw.js").catch(() => {});
-}
 if (!matchMedia("(pointer: coarse)").matches) input.focus();
