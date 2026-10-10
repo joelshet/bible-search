@@ -28,7 +28,7 @@ let reqId = 0;
 
 const narrow = matchMedia("(max-width: 860px)");
 // mapRead: null means "hide while reading on a phone, show on a laptop".
-const defaults = { size: "m", spacing: "normal", font: "serif", theme: "auto", ruler: false, italics: true, red: false, paragraphs: false, motion: false, bottom: false, rate: 1, version: "kjv", esvKey: "", sort: "relevance", map: true, mapRead: null };
+const defaults = { size: "m", spacing: "normal", font: "serif", theme: "auto", ruler: false, italics: true, red: false, bionic: false, paragraphs: false, motion: false, bottom: false, rate: 1, version: "kjv", esvKey: "", sort: "relevance", map: true, mapRead: null };
 let settings = { ...defaults };
 try {
   Object.assign(settings, JSON.parse(localStorage.getItem("bible-settings") || "{}"));
@@ -150,6 +150,7 @@ function ready(m) {
     ask,
     meta,
     verseHtml: versePlain,
+    textHtml,
     version,
     versionLabel: () => (settings.esvKey ? VERSIONS[settings.version] : ""),
     esv: esvChapter,
@@ -587,16 +588,28 @@ function esc(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 }
 
+// With the setting on, the first half of each word is bold, a place for the eye to land.
+// The verses are drawn that way, so a reader who leaves it off gets the same page as before.
+const WORD = /&\w+;|\p{L}+(?:['’]\p{L}+)*/gu; // an escaped character such as &amp; is stepped over
+function textHtml(s) {
+  if (!settings.bionic) return esc(s);
+  return esc(s).replace(WORD, (w) => {
+    if (w[0] === "&") return w;
+    const n = Math.ceil(w.length / 2);
+    return `<b>${w.slice(0, n)}</b>${w.slice(n)}`;
+  });
+}
+
 const pilcrow = (html) => html.replace("¶", '<span class="pilcrow">¶</span>');
 function segHtml(seg) {
-  if (seg.length === 1) return pilcrow(esc(seg[0]));
+  if (seg.length === 1) return pilcrow(textHtml(seg[0]));
   const [text, flags, why, strongs] = seg;
   const cls = ["w"];
   if (flags & 1) cls.push("it");
   if (flags & 2) cls.push("wj");
   if (why) cls.push("m", "m-" + why);
   const s = strongs ? ` data-s="${strongs.split(" ")[0]}"` : "";
-  return `<span class="${cls.join(" ")}"${s}>${esc(text)}</span>`;
+  return `<span class="${cls.join(" ")}"${s}>${textHtml(text)}</span>`;
 }
 const versePlain = (segs) => segs.map(segHtml).join("");
 
@@ -928,8 +941,10 @@ $("settings-form").addEventListener("change", (e) => {
   const t = e.target;
   settings[t.name] = t.type === "checkbox" ? t.checked : t.value.trim();
   applySettings();
-  // A key added or removed changes what the reader can show.
-  if (t.name === "esvKey" && mode === "read" && focusVerse >= 0) reader.open(focusVerse);
+  // A key added or removed changes what the reader can show, and bold word starts are part
+  // of how a verse is drawn, so the verses on the page are drawn again.
+  if (t.name === "bionic" && shown.q) runSearch(false);
+  if ((t.name === "esvKey" || t.name === "bionic") && mode === "read" && focusVerse >= 0) reader.open(focusVerse);
 });
 $("settings-btn").onclick = openSettings;
 $("help-btn").onclick = () => $("help-dialog").showModal();

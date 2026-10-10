@@ -4,12 +4,13 @@ const AHEAD = 2000; // how far past the bottom of the screen chapters are loaded
 
 export class Reader {
   // version() is "kjv", "both", or "esv"; esv(c) resolves to a chapter's ESV verses by number.
-  constructor(box, scroller, { ask, meta, verseHtml, onVerse, version, versionLabel, esv, esc }) {
+  constructor(box, scroller, { ask, meta, verseHtml, textHtml, onVerse, version, versionLabel, esv, esc }) {
     this.box = box;
     this.scroller = scroller;
     this.ask = ask;
     this.meta = meta;
     this.verseHtml = verseHtml;
+    this.textHtml = textHtml;
     this.onVerse = onVerse;
     this.version = version;
     this.versionLabel = versionLabel;
@@ -72,7 +73,7 @@ export class Reader {
       // Where the ESV numbers a verse the King James doesn't have, it joins the last one.
       const parts = [esv.get(n) || ""];
       if (n === last) for (const [k, text] of esv) if (k > last) parts.push(text);
-      return `<span class="esv">${this.esc(parts.join(" "))}</span>`;
+      return `<span class="esv">${this.textHtml(parts.join(" "))}</span>`;
     };
     const verses = ch.verses.map((x) => {
       const para = x.seg[0]?.[0]?.startsWith("¶") ? " para" : "";
