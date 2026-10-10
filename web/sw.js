@@ -1,5 +1,5 @@
 // Offline after the first visit: everything the app needs is cached up front.
-const VERSION = "373e9eb9de50";
+const VERSION = "e20d156e438c";
 const CACHE = `bible-${VERSION}`;
 const FILES = [
   "./", "index.html", "style.css", "app.js", "map.js", "reader.js", "worker.js",

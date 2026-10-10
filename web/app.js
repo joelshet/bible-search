@@ -269,20 +269,21 @@ function stateUrl() {
   const qs = p.toString().replace(/%3A/g, ":").replace(/%2C/g, ",");
   return location.pathname + (qs ? "?" + qs : "");
 }
-let lastPushed = "";
-function syncUrl(push) {
+// The Back button steps between places, and there are two: a page of results (or the home
+// page) and the reader opened from it. Opening the reader, when `enter` allows it, adds a
+// step that remembers the search it came from. Everything else, from typing to scrolling to
+// changing chapter, rewrites the step you're on.
+function syncUrl(enter) {
   const url = stateUrl();
   if (url === location.pathname + location.search) return;
+  const was = new URLSearchParams(location.search);
   // Browsers refuse history updates that come too fast, and some throw; a long scroll through
   // the reader can get there. The address then lags until the next update goes through.
   try {
-    if (push && url !== lastPushed) {
-      history.pushState(null, "", url);
-      lastPushed = url;
-    } else history.replaceState(null, "", url);
+    if (enter && mode === "read" && !was.has("read")) history.pushState({ from: was.get("q") || "" }, "", url);
+    else history.replaceState(mode === "read" ? history.state : null, "", url);
   } catch {}
 }
-let pauseTimer = 0;
 
 function restoreFromUrl() {
   const p = new URLSearchParams(location.search);
@@ -311,7 +312,7 @@ function restoreFromUrl() {
   if (!input.value && focusVerse >= 0) openReader(focusVerse, false);
 }
 window.addEventListener("popstate", () => {
-  lastPushed = ""; // after Back, opening the same verse again must add a step, not replace this one
+  leaving = false;
   if (meta) restoreFromUrl();
 });
 
@@ -386,11 +387,19 @@ $("read-btn").onclick = () => {
   v >= 0 ? openReader(v) : openContents();
 };
 
-// Back to the results, or to the home view when there was no search.
+// Back to the results, or to the home view when there was no search. When the reader was
+// opened from that very page, it's the step below this one, and leaving is the Back button:
+// the list returns as it was left, and reading result after result adds no steps.
+let leaving = false;
 function leaveReader() {
+  if (history.state?.from === input.value.trim()) {
+    if (!leaving) history.back();
+    leaving = true;
+    return;
+  }
   setMode("search");
   focusVerse = -1;
-  syncUrl(true);
+  syncUrl(false);
 }
 
 // A click on a chapter link or button opens it here. With a modifier key the link's
@@ -410,10 +419,10 @@ $("title").addEventListener("click", (e) => {
   if (!meta || e.metaKey || e.ctrlKey || e.shiftKey) return;
   e.preventDefault();
   input.value = "";
-  focusVerse = -1;
-  setMode("search");
   runSearch(false);
-  syncUrl(true);
+  if (mode === "read") return leaveReader();
+  focusVerse = -1;
+  syncUrl(false);
 });
 
 $("reader").addEventListener("click", (e) => {
@@ -468,7 +477,7 @@ function clearSearch() {
   if (mode !== "read") focusVerse = -1;
   runSearch(false);
   for (const el of $("reader").querySelectorAll(".m")) el.className = el.className.replace(/ m( m-\w+)?/, "");
-  syncUrl(true);
+  syncUrl(false);
 }
 $("clear").onclick = () => {
   clearSearch();
@@ -482,14 +491,11 @@ input.addEventListener("input", () => {
   openVerse = -1;
   runSearch(true);
   syncUrl(false);
-  clearTimeout(pauseTimer);
-  // A pause in typing becomes a back-button step.
-  pauseTimer = setTimeout(() => syncUrl(true), 1500);
 });
 $("search-form").addEventListener("submit", (e) => {
   e.preventDefault();
   if (selected < 0 && shown.total) select(0);
-  syncUrl(true);
+  syncUrl(false);
 });
 
 // New results start at the top, including ones that arrive while the reader is showing.
@@ -673,7 +679,7 @@ async function toggleContext(i) {
   el.querySelector(".text").classList.add("here");
   button.setAttribute("aria-expanded", "true");
   await renderContext(el, AROUND);
-  syncUrl(true);
+  syncUrl(false);
 }
 
 // The verses around a hit, `around` on each side and never past its chapter. They go above
@@ -764,7 +770,7 @@ $("lex").addEventListener("click", (e) => {
     input.value = s.dataset.search;
     focusVerse = -1;
     runSearch(false);
-    syncUrl(true);
+    syncUrl(false);
   }
   if (e.target.closest(".close")) $("lex").hidden = true;
 });
@@ -933,7 +939,7 @@ async function showQr() {
   $("qr-label").textContent = focusVerse >= 0 ? refOf(focusVerse) : input.value ? `“${input.value}”` : "Bible Search";
   $("qr-url").textContent = url;
   $("qr-dialog").showModal();
-  if (v >= 0) syncUrl(true);
+  if (v >= 0) syncUrl(false);
 }
 $("qr-btn").onclick = showQr;
 
@@ -979,7 +985,7 @@ document.querySelectorAll("[data-q]").forEach((b) =>
     input.value = b.dataset.q;
     focusVerse = -1;
     runSearch(false);
-    syncUrl(true);
+    syncUrl(false);
     input.focus();
   }));
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applySettings);
