@@ -25,7 +25,7 @@ Run this after changing anything in `src/`, `data/`, or `web/`. Edits to `web/` 
 ## How it works
 
 - `src/text.rs`: the tokenizer and a stemmer that knows 1611 English (runneth, saith, spake). The index and the queries share it.
-- `src/search.rs`: expands each word into its forms, completions while you type, the Strong's numbers behind it, WordNet and hand-written synonyms (`data/modern.tsv`), and spelling fixes. Ranking is BM25 with a bonus for verses that contain every word and keep the words in order. Function words only boost verses that already matched.
+- `src/search.rs`: expands each word into its forms, completions while you type, the Strong's numbers behind it, WordNet and hand-written synonyms (`data/modern.tsv`), and spelling fixes. Ranking is BM25 with a bonus for verses that contain every word and keep the words in order. Function words only boost verses that already matched. A passage remembered across verses comes back as one result ("Psalms 23:1-2"): runs of up to four neighbouring verses in a chapter are scored around the 300 best single verses, each verse past the first costs the run a fifth of its score, and both end verses must hold two of the query's words.
 - `src/index.rs`: the binary format. The download carries the text, per-word Strong's tags, the vocabulary, and synonyms. Postings and rendering counts are rebuilt on load, which halves the download.
 - `src/layout.rs`: the map. Each verse's area is proportional to its length, so text fits at one size everywhere. The Old Testament runs across the top, the New Testament along the bottom, and each section, book, and chapter is split in reading order.
 - `web/worker.js` runs the engine off the main thread and drops keystrokes that have already been superseded. `web/map.js` draws the map on a canvas, `web/reader.js` handles the contents page and continuous reading, and `web/app.js` handles everything else.
@@ -34,8 +34,9 @@ Run this after changing anything in `src/`, `data/`, or `web/`. Edits to `web/` 
 
 - Download: 2.3 MB for search (`bible.idx.gz`), 0.1 MB for the wasm, plus a 0.8 MB lexicon that loads after search is ready.
 - Engine load: 87 ms in Chrome after download.
-- Search: 0.2 to 1.4 ms per query in Chrome once warm. The first query or two run slower while the browser optimizes the wasm.
+- Search: 0.4 to 0.8 ms for a query of a few words in Chrome once warm, and 3 to 5 ms for one that quotes two or three verses. The first query or two run slower while the browser optimizes the wasm.
 - Half-remembered queries (`src/bin/eval.rs`): 27 of 29 at rank 1 on the tuned set, and 20 of 25 at rank 1 (22 of 25 in the top 3) on a held-out set written after tuning and never tuned against. Some entries in `data/modern.tsv` came from looking at tuned-set misses, so the held-out number is the honest one.
+- Passages quoted across verses: the whole passage is the first result for 11 of 12 on the set the run scoring was tuned on, and for 15 of 16 on a set written before tuning and scored once after.
 
 ## Sources and licenses
 

@@ -65,7 +65,10 @@ pub struct Query {
 
 pub struct Results {
     pub query: Query,
+    /// Each result's first verse.
     pub ids: Vec<u32>,
+    /// How many verses each result runs for: 1, or more for a passage.
+    pub spans: Vec<u8>,
     pub scores: Vec<f32>,
     pub full: Vec<bool>,
     pub full_count: usize,
@@ -78,6 +81,21 @@ pub struct Results {
 
 const K1: f32 = 1.2;
 const B: f32 = 0.5;
+
+/// How many of the best verses get the closer look: word order, and runs.
+const CLOSE: usize = 300;
+/// A passage remembered across several verses is one result: a run of neighbouring verses
+/// that between them hold the query. Runs grow from the best single verses.
+const MAX_RUN: usize = 4;
+/// What each verse past the first costs a run, so one verse that holds the query still wins.
+const RUN_COST: f32 = 0.8;
+
+struct Cand {
+    first: u32,
+    span: u8,
+    score: f32,
+    full: bool,
+}
 
 /// Letters and spaces only, for phrase containment checks.
 fn flatten(s: &str) -> String {
@@ -293,6 +311,11 @@ impl Bible {
         let mut content_mask = 0u32;
         let mut required_mask = 0u32;
         let mut targets: HashMap<Target, (usize, f32, Why)> = HashMap::new();
+        // Each term's score in each verse, kept only when runs of verses will be scored.
+        // A quoted phrase asks for verses that hold it, so it rules runs out.
+        let n_terms = query.terms.len().min(32);
+        let runs = query.phrases.is_empty() && query.terms.iter().take(32).filter(|t| !t.stop).count() >= 2;
+        let mut per = vec![0f32; if runs { n_terms * n } else { 0 }];
 
         for (i, term) in query.terms.iter().enumerate().take(32) {
             let bit = 1u32 << i;
@@ -327,6 +350,9 @@ impl Bible {
                 }
             }
             for &v in &touched {
+                if runs {
+                    per[i * n + v] = cur[v];
+                }
                 if term.stop {
                     stop_total[v] += cur[v];
                 } else {
@@ -349,7 +375,7 @@ impl Bible {
         };
         let phrases: Vec<String> = query.phrases.iter().map(|p| flatten(p)).collect();
         let n_content = content_mask.count_ones().max(1) as f32;
-        let mut cands: Vec<(u32, f32, bool)> = Vec::new();
+        let mut cands: Vec<Cand> = Vec::new();
         let mut literal_count = 0;
         for v in 0..n {
             if mask[v] == 0 || excluded[v] || mask[v] & required_mask != required_mask {
@@ -368,7 +394,7 @@ impl Bible {
             }
             let m = (mask[v] & content_mask).count_ones() as f32;
             let score = total[v] * (m / n_content).powf(1.5) + 0.3 * stop_total[v];
-            cands.push((v as u32, score, m == n_content));
+            cands.push(Cand { first: v as u32, span: 1, score, full: m == n_content });
             if literal[v] & content_mask == content_mask {
                 literal_count += 1;
             }
@@ -376,39 +402,92 @@ impl Bible {
 
         // Reward verses where the query's words sit next to each other in the same order.
         let stems: Vec<Option<u32>> = query.terms.iter().map(|t| self.stem_id(&t.typed)).collect();
+        let pairs = stems.windows(2).filter(|p| p[0].is_some() && p[1].is_some()).count().max(1);
+        let in_order = |first: usize, span: usize| {
+            let words = &self.word_stem[self.word_off[first] as usize..self.word_off[first + span] as usize];
+            let found = stems
+                .windows(2)
+                .filter(|p| p[0].is_some() && p[1].is_some() && words.windows(2).any(|w| Some(w[0]) == p[0] && Some(w[1]) == p[1]))
+                .count();
+            1.0 + 0.6 * found as f32 / pairs as f32
+        };
+        let by_score = |a: &Cand, b: &Cand| b.score.total_cmp(&a.score).then(a.first.cmp(&b.first));
         if stems.len() >= 2 {
-            cands.sort_by(|a, b| b.1.total_cmp(&a.1));
-            for c in cands.iter_mut().take(300) {
-                let v = c.0 as usize;
-                let vs: Vec<Option<u32>> = self.word_stem[self.word_range(v)].iter().map(|&s| Some(s)).collect();
-                let pairs = stems.windows(2).filter(|p| p[0].is_some() && p[1].is_some()).count().max(1);
-                let found = stems
-                    .windows(2)
-                    .filter(|p| p[0].is_some() && p[1].is_some() && vs.windows(2).any(|w| w[0] == p[0] && w[1] == p[1]))
-                    .count();
-                c.1 *= 1.0 + 0.6 * found as f32 / pairs as f32;
+            cands.sort_by(by_score);
+            for c in cands.iter_mut().take(CLOSE) {
+                c.score *= in_order(c.first as usize, 1);
             }
         }
 
-        if canonical {
-            cands.sort_by_key(|c| (!c.2, c.0));
-        } else {
-            cands.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+        if runs {
+            let mut seen: std::collections::HashSet<(usize, usize)> = Default::default();
+            for seed in 0..cands.len().min(CLOSE) {
+                let v = cands[seed].first as usize;
+                let chapter = self.chapter_range(self.chapter_of(v));
+                for span in 2..=MAX_RUN {
+                    for s in (v + 1).saturating_sub(span).max(chapter.start)..=v {
+                        let e = s + span - 1;
+                        if e >= chapter.end || !seen.insert((s, span)) {
+                            continue;
+                        }
+                        // Both end verses must hold two of the query's words, one of them a word the
+                        // rest of the run lacks. A neighbour with a single stray word doesn't make a passage.
+                        let inner = (s + 1..e).fold(0, |m, v| m | mask[v]);
+                        let anchors = |end: usize, other: usize| {
+                            mask[end].count_ones() >= 2 && mask[end] & !(inner | mask[other]) != 0
+                        };
+                        if !anchors(s, e) || !anchors(e, s) || (s..=e).any(|v| excluded[v]) {
+                            continue;
+                        }
+                        let (mut content, mut stop, mut m) = (0f32, 0f32, 0f32);
+                        for (i, term) in query.terms.iter().enumerate().take(32) {
+                            let best = (s..=e).map(|v| per[i * n + v]).fold(0f32, f32::max);
+                            if term.stop {
+                                stop += best;
+                            } else if best > 0.0 {
+                                content += best;
+                                m += 1.0;
+                            }
+                        }
+                        let score = (content * (m / n_content).powf(1.5) + 0.3 * stop) * RUN_COST.powi(span as i32 - 1);
+                        cands.push(Cand { first: s as u32, span: span as u8, score: score * in_order(s, span), full: m == n_content });
+                    }
+                }
+            }
+            // Best first, and a verse appears once: alone, or in the best run that holds it.
+            cands.sort_by(by_score);
+            let mut taken = vec![false; n];
+            cands.retain(|c| {
+                let range = c.first as usize..c.first as usize + c.span as usize;
+                let free = !taken[range.clone()].iter().any(|&t| t);
+                if free {
+                    taken[range].fill(true);
+                }
+                free
+            });
         }
-        let top = cands.iter().map(|c| c.1).fold(0f32, f32::max).max(1e-6);
+
+        if canonical {
+            cands.sort_by_key(|c| (!c.full, c.first));
+        } else {
+            cands.sort_by(by_score);
+        }
+        let top = cands.iter().map(|c| c.score).fold(0f32, f32::max).max(1e-6);
         let mut hits = vec![0u8; n];
         let mut book_seen = [false; 66];
-        for &(v, s, _) in &cands {
-            hits[v as usize] = 1 + (254.0 * (s / top).powf(0.7)) as u8;
-            book_seen[self.book[v as usize] as usize] = true;
+        for c in &cands {
+            let first = c.first as usize;
+            hits[first..first + c.span as usize].fill(1 + (254.0 * (c.score / top).powf(0.7)) as u8);
+            book_seen[self.book[first] as usize] = true;
         }
         Results {
             literal_count,
-            full_count: cands.iter().filter(|c| c.2).count(),
+            full_count: cands.iter().filter(|c| c.full).count(),
             books: book_seen.iter().filter(|&&b| b).count(),
-            ids: cands.iter().map(|c| c.0).collect(),
-            scores: cands.iter().map(|c| c.1).collect(),
-            full: cands.iter().map(|c| c.2).collect(),
+            ids: cands.iter().map(|c| c.first).collect(),
+            spans: cands.iter().map(|c| c.span).collect(),
+            scores: cands.iter().map(|c| c.score).collect(),
+            full: cands.iter().map(|c| c.full).collect(),
             hits,
             targets,
             query,
@@ -436,6 +515,7 @@ impl Bible {
             books: (!ids.is_empty()) as usize,
             scores: vec![1.0; ids.len()],
             full: vec![true; ids.len()],
+            spans: vec![1; ids.len()],
             ids,
             hits,
             targets: HashMap::new(),

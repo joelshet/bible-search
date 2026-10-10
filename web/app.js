@@ -538,7 +538,7 @@ function showPlace() {
   const s = shown.summary;
   if (s.reference) add(s.total ? plural(s.total, "verse") : "No such passage");
   else if (!s.total) add("Nothing matched. Try fewer words, or say it the way you remember it.");
-  else if (s.terms > 1) add(`${s.full.toLocaleString()} with every word · ${plural(s.total, "verse")} with some · ${plural(s.books, "book")}`);
+  else if (s.terms > 1) add(`${s.full.toLocaleString()} with every word · ${plural(s.total, "result")} with some · ${plural(s.books, "book")}`);
   else if (s.literal && s.literal < s.total) add(`${plural(s.literal, "verse")} with “${esc(s.word)}” · ${s.total.toLocaleString()} counting related words · ${plural(s.books, "book")}`);
   else add(`${plural(s.total, "verse")} · ${plural(s.books, "book")}`);
   for (const n of s.notes) add(`spelling: ${esc(n)}`, "note");
@@ -562,7 +562,7 @@ function showResults(m) {
   if (pendingOpen >= 0) {
     const v = pendingOpen;
     pendingOpen = -1;
-    const i = m.page.findIndex((h) => h.id === v);
+    const i = m.page.findIndex((h) => h.id <= v && v <= h.id + (h.rest?.length ?? 0));
     if (i >= 0) {
       select(i, false);
       toggleContext(i);
@@ -613,16 +613,26 @@ function segHtml(seg) {
 }
 const versePlain = (segs) => segs.map(segHtml).join("");
 
+const verseP = (x) => `<p data-v="${x.id}"><sup>${x.v}</sup>${versePlain(x.seg)}</p>`;
+
 // A hit reads top to bottom: where it is and what you can do there, the verse, then why it matched.
+// A passage remembered across verses is one hit, "Psalms 23:1-4", with its verses numbered.
 function hitHtml(h) {
-  const why = (h.why || []).map(([text, code]) => code
-    ? `<button type="button" class="why" data-code="${code}">${esc(text)}</button>`
-    : `<span class="why">${esc(text)}</span>`).join("");
-  return `<li class="hit${h.full ? "" : " partial"}" data-v="${h.id}">
-    <div class="hit-head"><button type="button" class="ref">${esc(h.ref)}</button>
+  const verses = [h, ...(h.rest || [])];
+  const seen = new Set();
+  const why = verses.flatMap((x) => x.why || []).filter(([text]) => !seen.has(text) && seen.add(text)).slice(0, 4)
+    .map(([text, code]) => code
+      ? `<button type="button" class="why" data-code="${code}">${esc(text)}</button>`
+      : `<span class="why">${esc(text)}</span>`).join("");
+  const ref = h.rest ? `${h.ref}-${verses.at(-1).v}` : h.ref;
+  const text = h.rest
+    ? `<div class="text" data-v="${h.id}">${verses.map(verseP).join("")}</div>`
+    : `<p class="text" data-v="${h.id}"><sup>${h.v}</sup>${versePlain(h.seg)}</p>`;
+  return `<li class="hit${h.full ? "" : " partial"}${h.rest ? " passage" : ""}" data-v="${h.id}" data-span="${verses.length}">
+    <div class="hit-head"><button type="button" class="ref">${esc(ref)}</button>
       <button type="button" class="act" data-act="context" aria-expanded="false">context</button>
       <button type="button" class="act" data-read="${h.id}">read</button></div>
-    <p class="text" data-v="${h.id}"><sup>${h.v}</sup>${versePlain(h.seg)}</p>${why ? `<p class="notes">${why}</p>` : ""}</li>`;
+    ${text}${why ? `<p class="notes">${why}</p>` : ""}</li>`;
 }
 
 function items() {
@@ -674,10 +684,11 @@ async function renderContext(el, around) {
   if (!ch || !el.classList.contains("open")) return;
   for (const box of el.querySelectorAll(".context")) box.remove();
   const at = ch.verses.findIndex((x) => x.id === v);
+  const span = Number(el.dataset.span);
   const before = ch.verses.slice(Math.max(0, at - around), at);
-  const after = ch.verses.slice(at + 1, at + 1 + around);
-  const html = (verses) => verses.map((x) => `<p data-v="${x.id}"><sup>${x.v}</sup>${versePlain(x.seg)}</p>`).join("");
-  const more = before.length + after.length + 1 < ch.verses.length
+  const after = ch.verses.slice(at + span, at + span + around);
+  const html = (verses) => verses.map(verseP).join("");
+  const more = before.length + after.length + span < ch.verses.length
     ? `<nav><button type="button" data-more="${around + AROUND}">more</button></nav>` : "";
   const text = el.querySelector(".text");
   if (before.length) text.insertAdjacentHTML("beforebegin", `<div class="context">${html(before)}</div>`);

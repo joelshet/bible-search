@@ -116,7 +116,19 @@ pub fn page(b: &Bible, r: &Results, offset: usize, limit: usize) -> String {
         }
         verse(&mut out, b, v as usize, Some(r));
         out.pop();
-        let _ = write!(out, ",\"full\":{}}}", r.full[offset + i]);
+        let _ = write!(out, ",\"full\":{}", r.full[offset + i]);
+        // A passage carries the verses after its first.
+        let span = r.spans[offset + i] as usize;
+        if span > 1 {
+            out.push_str(",\"rest\":[");
+            for next in v as usize + 1..v as usize + span {
+                verse(&mut out, b, next, Some(r));
+                out.push(',');
+            }
+            out.pop();
+            out.push(']');
+        }
+        out.push('}');
     }
     out.push(']');
     out

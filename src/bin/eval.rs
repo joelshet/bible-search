@@ -72,6 +72,43 @@ const HELD_OUT: &[(&str, &[&str])] = &[
     ("let your light shine before people", &["MAT 5:16"]),
 ];
 
+/// Passages remembered across verses. Each answer is a set of verses that must all sit in one
+/// result; a query with two homes (Matthew and Luke) lists both. The run scoring was tuned on these.
+const PASSAGES: &[(&str, &[&[&str]])] = &[
+    ("trust in the lord with all your heart and lean not on your own understanding in all your ways acknowledge him and he will make your paths straight", &[&["PRO 3:5", "PRO 3:6"]]),
+    ("the lord is my shepherd i shall not want he makes me lie down in green pastures he leads me beside still waters", &[&["PSA 23:1", "PSA 23:2"]]),
+    ("ask and it will be given to you seek and you will find knock and the door will be opened for everyone who asks receives", &[&["MAT 7:7", "MAT 7:8"], &["LUK 11:9", "LUK 11:10"]]),
+    ("i lift up my eyes to the hills where does my help come from my help comes from the lord", &[&["PSA 121:1", "PSA 121:2"]]),
+    ("do not be anxious about anything but in everything by prayer and the peace of god which passes all understanding will guard your hearts", &[&["PHP 4:6", "PHP 4:7"]]),
+    ("fruit of the spirit is love joy peace patience kindness goodness faithfulness gentleness self control", &[&["GAL 5:22", "GAL 5:23"]]),
+    ("for god so loved the world for god did not send his son into the world to condemn the world", &[&["JHN 3:16", "JHN 3:17"]]),
+    ("blessed are the poor in spirit blessed are those who mourn blessed are the meek", &[&["MAT 5:3", "MAT 5:4", "MAT 5:5"]]),
+    ("shepherd green pastures still waters valley of the shadow of death", &[&["PSA 23:2", "PSA 23:4"]]),
+    ("love is patient love is kind it does not envy it is not self seeking it is not easily angered", &[&["1CO 13:4", "1CO 13:5"]]),
+    ("armor of god belt of truth breastplate of righteousness shield of faith sword of the spirit", &[&["EPH 6:14", "EPH 6:16", "EPH 6:17"]]),
+    ("valley of dry bones prophesy breath", &[&["EZK 37:4"]]),
+];
+
+/// Written before the run scoring was tuned, scored once after, and never tuned against.
+const PASSAGES_HELD_OUT: &[(&str, &[&[&str]])] = &[
+    ("in the beginning was the word and the word was with god and the word was god he was with god in the beginning", &[&["JHN 1:1", "JHN 1:2"]]),
+    ("our father in heaven hallowed be your name your kingdom come your will be done on earth as it is in heaven", &[&["MAT 6:9", "MAT 6:10"], &["LUK 11:2"]]),
+    ("give us this day our daily bread and forgive us our debts as we forgive our debtors", &[&["MAT 6:11", "MAT 6:12"]]),
+    ("the lord bless you and keep you the lord make his face shine upon you and be gracious to you", &[&["NUM 6:24", "NUM 6:25"]]),
+    ("go and make disciples of all nations baptizing them in the name of the father and of the son and of the holy spirit teaching them to obey everything i have commanded you", &[&["MAT 28:19", "MAT 28:20"]]),
+    ("for by grace you have been saved through faith and this is not your own doing it is the gift of god not a result of works so that no one may boast", &[&["EPH 2:8", "EPH 2:9"]]),
+    ("love the lord your god with all your heart and with all your soul and with all your mind this is the first and greatest commandment", &[&["MAT 22:37", "MAT 22:38"]]),
+    ("a time to be born and a time to die a time to plant a time to kill and a time to heal a time to weep and a time to laugh", &[&["ECC 3:2", "ECC 3:3", "ECC 3:4"]]),
+    ("even though i walk through the valley of the shadow of death i will fear no evil you prepare a table before me in the presence of my enemies", &[&["PSA 23:4", "PSA 23:5"]]),
+    ("have you not known have you not heard the everlasting god does not faint or grow weary he gives power to the faint", &[&["ISA 40:28", "ISA 40:29"]]),
+    ("consider the lilies of the field how they grow they toil not neither do they spin yet solomon in all his glory was not arrayed like one of these", &[&["MAT 6:28", "MAT 6:29"], &["LUK 12:27"]]),
+    ("rejoice in the lord always again i say rejoice let your gentleness be known to all the lord is near", &[&["PHP 4:4", "PHP 4:5"]]),
+    ("the heavens declare the glory of god the skies proclaim the work of his hands day after day they pour forth speech", &[&["PSA 19:1", "PSA 19:2"]]),
+    ("create in me a clean heart o god and renew a right spirit within me do not cast me away from your presence", &[&["PSA 51:10", "PSA 51:11"]]),
+    ("i am the vine you are the branches apart from me you can do nothing if anyone does not abide in me he is thrown away", &[&["JHN 15:5", "JHN 15:6"]]),
+    ("come to me all who are weary and burdened and i will give you rest take my yoke upon you and learn from me", &[&["MAT 11:28", "MAT 11:29"]]),
+];
+
 const DEMOS: &[&str] = &["nebuchadnezer", "agape", "G26", "jn 3:16", "love in:john", "\"the lord is my shepherd\""];
 
 
@@ -79,6 +116,23 @@ fn find(b: &Bible, r: &str) -> usize {
     let (code, cv) = r.split_once(' ').unwrap();
     let (c, v) = cv.split_once(':').unwrap();
     b.find_verse(books::by_code(code).unwrap(), c.parse().unwrap(), v.parse().unwrap()).unwrap()
+}
+
+/// "Psalms 23:1-4" for a run of verses, "Psalms 23:1" for one.
+fn label(b: &Bible, r: &bible::search::Results, i: usize) -> String {
+    let v = r.ids[i] as usize;
+    match r.spans[i] {
+        1 => b.reference(v),
+        n => format!("{}-{}", b.reference(v), b.verse[v + n as usize - 1]),
+    }
+}
+
+/// The first result that holds every verse of one of the answers.
+fn rank(r: &bible::search::Results, answers: &[Vec<usize>]) -> Option<usize> {
+    (0..r.ids.len()).find(|&i| {
+        let range = r.ids[i] as usize..r.ids[i] as usize + r.spans[i] as usize;
+        answers.iter().any(|a| a.iter().all(|v| range.contains(v)))
+    })
 }
 
 fn main() {
@@ -111,31 +165,37 @@ fn main() {
             println!("  term {:?} stop={} {}", t.typed, t.stop, exps.join(" "));
         }
         for (i, &v) in r.ids.iter().take(10).enumerate() {
-            let v = v as usize;
-            println!("{:2}. {:7.2} {}  {}\n      {:?}", i + 1, r.scores[i], b.reference(v), b.verse_text(v), r.reasons(&b, v).iter().map(|(text, _)| text.as_str()).collect::<Vec<_>>());
+            println!("{:2}. {:7.2} {}", i + 1, r.scores[i], label(&b, &r, i));
+            for v in v as usize..v as usize + r.spans[i] as usize {
+                println!("      {}\n      {:?}", b.verse_text(v), r.reasons(&b, v).iter().map(|(text, _)| text.as_str()).collect::<Vec<_>>());
+            }
         }
         return;
     }
 
     let mut worst = 0f64;
-    for (label, cases) in [("tuned set", CASES), ("held-out set", HELD_OUT)] {
+    type Case = (&'static str, Vec<Vec<&'static str>>);
+    let single = |set: &[(&'static str, &[&'static str])]| -> Vec<Case> { set.iter().map(|(q, want)| (*q, want.iter().map(|w| vec![*w]).collect())).collect() };
+    let several = |set: &[(&'static str, &[&[&'static str]])]| -> Vec<Case> { set.iter().map(|(q, want)| (*q, want.iter().map(|a| a.to_vec()).collect())).collect() };
+    let sets = [("tuned set", single(CASES)), ("held-out set", single(HELD_OUT)), ("passages, tuned", several(PASSAGES)), ("passages, held out", several(PASSAGES_HELD_OUT))];
+    for (name, cases) in &sets {
         let (mut top1, mut top3) = (0, 0);
-        println!("\n{label}");
-        for (q, want) in cases.iter().filter(|(_, w)| !w.is_empty()) {
+        println!("\n{name}");
+        for (q, want) in cases {
             let t = Instant::now();
             let r = b.search(q, false, false);
             let us = t.elapsed().as_secs_f64() * 1e6;
             worst = worst.max(us);
-            let ids: Vec<usize> = want.iter().map(|w| find(&b, w)).collect();
-            let rank = r.ids.iter().position(|&v| ids.contains(&(v as usize)));
+            let answers: Vec<Vec<usize>> = want.iter().map(|a| a.iter().map(|w| find(&b, w)).collect()).collect();
+            let rank = rank(&r, &answers);
             top1 += (rank == Some(0)) as usize;
             top3 += rank.is_some_and(|r| r < 3) as usize;
             let shown = rank.map_or("miss".to_string(), |r| format!("#{}", r + 1));
-            let first = r.ids.first().map(|&v| b.reference(v as usize)).unwrap_or_default();
+            let first = if r.ids.is_empty() { String::new() } else { label(&b, &r, 0) };
+            let q: String = q.chars().take(58).collect();
             println!("{shown:>5} {us:6.0} µs  {q:58} top: {first}");
         }
-        let judged = cases.iter().filter(|(_, w)| !w.is_empty()).count();
-        println!("{label}: top 1 {top1}/{judged}, top 3 {top3}/{judged}");
+        println!("{name}: top 1 {top1}/{n}, top 3 {top3}/{n}", n = cases.len());
     }
     println!();
     for q in DEMOS {

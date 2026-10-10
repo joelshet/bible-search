@@ -211,9 +211,11 @@ button.why:hover { color: var(--ink); }
 
 /* Context: a few verses above and below the hit's own text, which gets a verse number while they show. */
 .context p, .open .text { padding: 1px 0; }
-.open p.here { background: var(--here); box-shadow: -10px 0 0 var(--here), 10px 0 0 var(--here); }
+.open .here { background: var(--here); box-shadow: -10px 0 0 var(--here), 10px 0 0 var(--here); }
 .hit sup { font: 13px var(--garamond); color: var(--rubric); margin-right: 3px; vertical-align: 0.35em; }
 .hit:not(.open) .text sup { display: none; }
+.hit.passage .text sup { display: inline; }
+.text p { margin: 0; padding: 1px 0; }
 .context nav { margin-top: 6px; }
 .context nav button { font-style: italic; font-size: 16px; }
 #more { height: 1px; }
